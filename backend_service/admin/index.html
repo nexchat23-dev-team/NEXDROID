@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEX-APP Premium Admin</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #050505;
+            --panel-bg: rgba(15, 15, 20, 0.65);
+            --panel-border: rgba(255, 255, 255, 0.08);
+            --primary: #8b5cf6;
+            --secondary: #3b82f6;
+            --accent: #06b6d4;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --danger: #ef4444;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --glow: 0 0 20px rgba(139, 92, 246, 0.4);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            position: relative;
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
+
+        /* Background ambient lights */
+        .ambient-light {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(100px);
+            opacity: 0.4;
+            z-index: 0;
+            animation: float 20s infinite alternate;
+        }
+        .light-1 { top: -100px; left: -100px; width: 400px; height: 400px; background: var(--primary); }
+        .light-2 { bottom: -100px; right: -100px; width: 500px; height: 500px; background: var(--secondary); }
+        .light-3 { top: 40%; left: 50%; width: 300px; height: 300px; background: var(--accent); animation-delay: -5s; }
+
+        @keyframes float {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(50px, 50px); }
+        }
+
+        .glass {
+            background: var(--panel-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--panel-border);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        /* Login Screen - Full standalone */
+        #login-screen {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            background: #020205;
+            transition: opacity 0.5s ease, visibility 0.5s;
+            overflow: hidden;
+        }
+        
+        /* Animated gradient mesh background for login */
+        .login-bg {
+            position: absolute; top:0; left:0; width:100%; height:100%; z-index: -1;
+            background: radial-gradient(circle at 15% 50%, rgba(139, 92, 246, 0.15), transparent 25%),
+                        radial-gradient(circle at 85% 30%, rgba(59, 130, 246, 0.15), transparent 25%),
+                        radial-gradient(circle at 50% 80%, rgba(6, 182, 212, 0.15), transparent 25%);
+            animation: bgShift 15s ease-in-out infinite alternate;
+        }
+        @keyframes bgShift {
+            0% { background-position: 0% 0%; }
+            100% { background-position: 100% 100%; }
+        }
+
+        .login-box {
+            width: 420px;
+            padding: 40px;
+            text-align: center;
+            position: relative;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-10px); }
+            40% { transform: translateX(10px); }
+            60% { transform: translateX(-10px); }
+            80% { transform: translateX(10px); }
+        }
+        .shake { animation: shake 0.4s ease-in-out; }
+
+        .login-box .logo-text {
+            font-size: 3rem;
+            font-weight: 800;
+            letter-spacing: 4px;
+            margin-bottom: 5px;
+            background: linear-gradient(135deg, var(--accent), var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px rgba(139, 92, 246, 0.5);
+        }
+        .login-box .subtitle {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-bottom: 35px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .form-group { margin-bottom: 20px; text-align: left; }
+        .form-group label { display: block; margin-bottom: 8px; font-size: 0.9rem; color: var(--text-muted); }
+        .form-group input { 
+            width: 100%; padding: 14px; border-radius: 8px; border: 1px solid var(--panel-border); 
+            background: rgba(0,0,0,0.5); color: white; outline: none; transition: all 0.3s;
+            font-size: 1rem;
+        }
+        .form-group input:focus { border-color: var(--primary); box-shadow: var(--glow); background: rgba(0,0,0,0.7); }
+        
+        #login-error {
+            color: var(--danger);
+            font-size: 0.85rem;
+            margin-bottom: 15px;
+            height: 15px;
+            display: none;
+        }
+
+        .btn {
+            width: 100%; padding: 14px; border: none; border-radius: 8px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            color: white; font-weight: 600; font-size: 1rem; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(139, 92, 246, 0.6); }
+        .btn:active { transform: translateY(0); }
+
+        /* App Layout */
+        #app-layout {
+            display: none;
+            width: 100%; height: 100%;
+            z-index: 10;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 260px;
+            margin: 16px;
+            padding: 24px 0;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s;
+        }
+        .sidebar-brand {
+            padding: 0 24px 24px;
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            background: -webkit-linear-gradient(45deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            border-bottom: 1px solid var(--panel-border);
+            margin-bottom: 24px;
+        }
+        .nav-list { list-style: none; overflow-y: auto; flex: 1; padding: 0 12px; }
+        .nav-list::-webkit-scrollbar { width: 4px; }
+        .nav-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+        .nav-item { margin-bottom: 8px; }
+        .nav-link {
+            display: flex; align-items: center; padding: 12px 16px; color: var(--text-muted);
+            text-decoration: none; border-radius: 8px; transition: all 0.3s; position: relative;
+        }
+        .nav-link:hover { color: var(--text-main); background: rgba(255,255,255,0.05); transform: translateX(5px); }
+        .nav-link.active {
+            color: white;
+            background: linear-gradient(90deg, rgba(139, 92, 246, 0.2), transparent);
+            border-left: 3px solid var(--primary);
+            box-shadow: inset 20px 0 20px -20px var(--primary);
+        }
+
+        /* Main Content */
+        .main-wrapper {
+            flex: 1; display: flex; flex-direction: column;
+            margin: 16px 16px 16px 0;
+        }
+        .header {
+            height: 70px; display: flex; justify-content: space-between; align-items: center;
+            padding: 0 24px; margin-bottom: 16px;
+        }
+        .header-title { font-size: 1.25rem; font-weight: 600; }
+        .header-right { display: flex; align-items: center; gap: 20px; }
+        .status-indicator { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
+        .dot { width: 10px; height: 10px; background: var(--success); border-radius: 50%; box-shadow: 0 0 10px var(--success); animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 0.5; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.2); } 100% { opacity: 0.5; transform: scale(0.8); } }
+        .user-info { display: flex; align-items: center; gap: 12px; }
+        .avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(45deg, var(--primary), var(--secondary)); display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .logout-btn { background: rgba(255,255,255,0.1); border: none; color: white; padding: 8px 16px; border-radius: 6px; cursor: pointer; transition: 0.3s; }
+        .logout-btn:hover { background: var(--danger); }
+
+        .content-area {
+            flex: 1; padding: 24px; overflow-y: auto; position: relative;
+        }
+        .content-area::-webkit-scrollbar { width: 6px; }
+        .content-area::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 6px; }
+        
+        .section { display: none; animation: fadeIn 0.4s ease forwards; }
+        .section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Reusable UI Components */
+        .grid-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 24px; }
+        .stat-card { padding: 20px; display: flex; flex-direction: column; gap: 12px; transition: 0.3s; }
+        .stat-card:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-color: rgba(255,255,255,0.2); }
+        .stat-label { color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; }
+        .stat-value { font-size: 2rem; font-weight: 700; color: white; }
+        
+        .panel { padding: 24px; margin-bottom: 24px; }
+        .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .panel-title { font-size: 1.1rem; font-weight: 600; }
+
+        .table-responsive { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th { padding: 12px 16px; border-bottom: 1px solid var(--panel-border); color: var(--text-muted); font-weight: 500; font-size: 0.9rem; }
+        td { padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.95rem; }
+        tr:hover td { background: rgba(255,255,255,0.02); }
+        
+        .badge { padding: 4px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+        .badge.success { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+        .badge.danger { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+        .badge.warning { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+
+        .btn-sm { padding: 6px 12px; font-size: 0.8rem; border-radius: 4px; border: none; cursor: pointer; transition: 0.3s; color: white; }
+        .btn-primary { background: var(--primary); }
+        .btn-primary:hover { background: #7c3aed; }
+        .btn-danger { background: rgba(239, 68, 68, 0.2); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); }
+        .btn-danger:hover { background: var(--danger); color: white; }
+
+        .input-group { display: flex; gap: 10px; margin-bottom: 20px; }
+        .input-control { padding: 10px 16px; border-radius: 8px; border: 1px solid var(--panel-border); background: rgba(0,0,0,0.3); color: white; flex: 1; outline: none; }
+        .input-control:focus { border-color: var(--primary); }
+        select.input-control { appearance: none; }
+        select.input-control option { background: var(--bg-color); color: white; }
+
+        /* Feature Toggles */
+        .toggle-switch { position: relative; display: inline-block; width: 50px; height: 26px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.1); transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--primary); box-shadow: 0 0 10px var(--primary); }
+        input:checked + .slider:before { transform: translateX(24px); }
+        input:disabled + .slider { opacity: 0.5; cursor: not-allowed; }
+
+        /* Logs Viewer */
+        .log-viewer { font-family: monospace; background: rgba(0,0,0,0.5); padding: 16px; border-radius: 8px; height: 400px; overflow-y: auto; }
+        .log-line { margin-bottom: 4px; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.02); padding-bottom: 2px; }
+        .log-INFO { color: var(--success); }
+        .log-WARN { color: var(--warning); }
+        .log-ERROR { color: var(--danger); }
+
+        /* Health Bar */
+        .health-bar-container { width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; margin-top: 10px; }
+        .health-bar { height: 100%; background: linear-gradient(90deg, var(--success), var(--accent)); width: 98%; }
+
+        /* Toast Container */
+        #toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
+        .toast { padding: 16px 24px; border-radius: 8px; color: white; display: flex; align-items: center; gap: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); animation: slideIn 0.3s ease; }
+        .toast.success { background: rgba(16, 185, 129, 0.9); border-left: 4px solid var(--success); }
+        .toast.error { background: rgba(239, 68, 68, 0.9); border-left: 4px solid var(--danger); }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        /* Modals */
+        #modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); z-index: 2000; align-items: center; justify-content: center; }
+        .modal-box { width: 400px; padding: 24px; }
+        .modal-title { margin-bottom: 16px; font-size: 1.2rem; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
+    </style>
+</head>
+<body>
+
+    <!-- Ambient Background (Dashboard) -->
+    <div class="ambient-light light-1"></div>
+    <div class="ambient-light light-2"></div>
+    <div class="ambient-light light-3"></div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container"></div>
+
+    <!-- Modal -->
+    <div id="modal-overlay">
+        <div class="glass modal-box" id="confirm-modal">
+            <h3 class="modal-title" id="modal-title">Confirm Action</h3>
+            <p id="modal-text" class="text-muted" style="color: var(--text-muted); margin-bottom: 20px;">Are you sure?</p>
+            <div class="modal-actions">
+                <button class="btn-sm" style="background: rgba(255,255,255,0.1);" onclick="closeModal()">Cancel</button>
+                <button class="btn-sm btn-primary" id="modal-confirm-btn">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Screen -->
+    <div id="login-screen">
+        <div class="login-bg"></div>
+        <div class="glass login-box" id="login-box">
+            <div class="logo-text">NEX</div>
+            <div class="subtitle">Admin Control Center</div>
+            
+            <div id="login-error">Invalid credentials</div>
+            
+            <form id="login-form">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="login-username" placeholder="admin" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="login-password" placeholder="Enter password" required>
+                </div>
+                <button type="submit" class="btn">Sign In</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app-layout">
+        <!-- Sidebar -->
+        <aside class="glass sidebar">
+            <div class="sidebar-brand">NEX-APP</div>
+            <ul class="nav-list">
+                <li class="nav-item"><a href="#" class="nav-link active" data-target="overview"><span>Overview</span></a></li>
+                <li class="nav-item"><a href="#" class="nav-link" data-target="users"><span>Users</span></a></li>
+                <li class="nav-item"><a href="#" class="nav-link" data-target="chat"><span>Chat & Social</span></a></li>
+                <li class="nav-item"><a href="#" class="nav-link" data-target="calls"><span>Calls</span></a></li>
+                <li class="nav-item"><a href="#" class="nav-link" data-target="gaming"><span>Gaming Hub</span></a></li>
+                <li class="nav-item"><a href="#" class="nav-link" data-target="defender"><span>Security Defender</span></a></li>
+                <li class="nav-item"><a href="#" class="nav-link" data-target="firewall"><span>Firewall</span></a></li>
+                <li class="nav-item"><a href="#" class="nav-link" data-target="cloner"><span>App Cloner</span></a></li>
+                <li class="nav-item"><a href="#" class="nav-link" data-target="marketplace"><span>Marketplace</span></a></li>
+                <li class="nav-item"><a href="#" class="nav-link" data-target="flags"><span>Feature Flags</span></a></li>
+                <li class="nav-item"><a href="#" class="nav-link" data-target="reports"><span>Reports</span></a></li>
+                <li class="nav-item"><a href="#" class="nav-link" data-target="announcements"><span>Announcements</span></a></li>
+                <li class="nav-item"><a href="#" class="nav-link" data-target="logs"><span>System Logs</span></a></li>
+            </ul>
+        </aside>
+
+        <!-- Main Content Wrapper -->
+        <main class="main-wrapper">
+            <!-- Header -->
+            <header class="glass header">
+                <div class="header-title" id="current-section-title">Overview</div>
+                <div class="header-right">
+                    <div class="status-indicator">
+                        <div class="dot"></div> System Online (99.9% Uptime)
+                    </div>
+                    <div class="user-info">
+                        <div class="avatar">AD</div>
+                        <span id="admin-name">Super Admin</span>
+                    </div>
+                    <button class="logout-btn" onclick="logout()">Logout</button>
+                </div>
+            </header>
+
+            <!-- Scrollable Content Area -->
+            <div class="glass content-area">
+                
+                <!-- OVERVIEW SECTION -->
+                <div id="overview" class="section active">
+                    <div class="grid-cards">
+                        <div class="glass stat-card">
+                            <span class="stat-label">Total Users</span>
+                            <span class="stat-value" id="stat-users">--</span>
+                        </div>
+                        <div class="glass stat-card">
+                            <span class="stat-label">Active Sessions</span>
+                            <span class="stat-value" id="stat-sessions">--</span>
+                        </div>
+                        <div class="glass stat-card">
+                            <span class="stat-label">Messages Sent</span>
+                            <span class="stat-value" id="stat-msgs">--</span>
+                        </div>
+                        <div class="glass stat-card">
+                            <span class="stat-label">Threats Blocked</span>
+                            <span class="stat-value" style="color: var(--accent)" id="stat-threats">--</span>
+                        </div>
+                        <div class="glass stat-card">
+                            <span class="stat-label">Active Games</span>
+                            <span class="stat-value" id="stat-games">--</span>
+                        </div>
+                        <div class="glass stat-card">
+                            <span class="stat-label">Pending Reports</span>
+                            <span class="stat-value" style="color: var(--warning)" id="stat-reports">--</span>
+                        </div>
+                    </div>
+                    
+                    <div class="glass panel">
+                        <div class="panel-header">
+                            <div class="panel-title">System Health & Load</div>
+                        </div>
+                        <p style="color: var(--text-muted); margin-bottom: 5px;">CPU Usage: 24% | Memory: 4.2GB / 16GB</p>
+                        <div class="health-bar-container">
+                            <div class="health-bar"></div>
+                        </div>
+                        <div style="margin-top: 20px;">
+                            <canvas id="overviewChart" width="800" height="200"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- USERS SECTION -->
+                <div id="users" class="section">
+                    <div class="glass panel">
+                        <div class="panel-header">
+                            <div class="panel-title">User Management</div>
+                        </div>
+                        <div class="input-group">
+                            <input type="text" class="input-control" placeholder="Search by name or email..." id="user-search">
+                            <select class="input-control" style="max-width: 200px;" id="user-filter">
+                                <option value="all">All Roles</option>
+                                <option value="user">User</option>
+                                <option value="admin">Admin</option>
+                            </select>
+                            <button class="btn btn-primary" style="width: auto; padding: 10px 20px;" onclick="loadUsers()">Search</button>
+                        </div>
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>User</th>
+                                        <th>Email</th>
+                                        <th>Role</th>
+                                        <th>Status</th>
+                                        <th>Joined</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="users-tbody">
+                                    <!-- Rendered via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DEFENDER SECTION -->
+                <div id="defender" class="section">
+                    <div class="grid-cards">
+                        <div class="glass stat-card">
+                            <span class="stat-label">Engine Status</span>
+                            <span class="stat-value" style="color: var(--success)">Active</span>
+                        </div>
+                        <div class="glass stat-card">
+                            <span class="stat-label">Definitions Version</span>
+                            <span class="stat-value" id="def-version">v2.4.109</span>
+                        </div>
+                        <div class="glass stat-card">
+                            <span class="stat-label">Threats Today</span>
+                            <span class="stat-value" style="color: var(--danger)">1,204</span>
+                        </div>
+                    </div>
+                    <div class="glass panel">
+                        <div class="panel-header">
+                            <div class="panel-title">Update Definitions</div>
+                        </div>
+                        <div class="input-group" style="max-width: 500px;">
+                            <input type="text" class="input-control" placeholder="Paste signature hash URL...">
+                            <button class="btn btn-primary" style="width: auto;" onclick="showToast('Definitions updating in background', 'success')">Force Update</button>
+                        </div>
+                    </div>
+                    <div class="glass panel">
+                        <div class="panel-header">
+                            <div class="panel-title">Recent Blocked Threats</div>
+                        </div>
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Hash / IP</th>
+                                        <th>Type</th>
+                                        <th>Severity</th>
+                                        <th>Action Taken</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="threats-tbody">
+                                    <tr><td>192.168.1.100</td><td>DDoS Attempt</td><td><span class="badge danger">CRITICAL</span></td><td>IP Banned</td></tr>
+                                    <tr><td>0x8F9B2C...</td><td>Malware APK Signature</td><td><span class="badge danger">HIGH</span></td><td>Upload Blocked</td></tr>
+                                    <tr><td>10.0.0.55</td><td>Spam Botnet</td><td><span class="badge warning">MEDIUM</span></td><td>Rate Limited</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FIREWALL SECTION -->
+                <div id="firewall" class="section">
+                    <div class="grid-cards">
+                        <div class="glass panel" style="margin-bottom: 0;">
+                            <div class="panel-header"><div class="panel-title">Inbound Blocking</div>
+                                <label class="toggle-switch"><input type="checkbox" checked><span class="slider"></span></label>
+                            </div>
+                            <p style="color: var(--text-muted); font-size: 0.9rem;">Drop suspicious incoming connections automatically.</p>
+                        </div>
+                        <div class="glass panel" style="margin-bottom: 0;">
+                            <div class="panel-header"><div class="panel-title">Outbound Filtering</div>
+                                <label class="toggle-switch"><input type="checkbox" checked><span class="slider"></span></label>
+                            </div>
+                            <p style="color: var(--text-muted); font-size: 0.9rem;">Prevent apps from communicating with known C2 servers.</p>
+                        </div>
+                        <div class="glass panel" style="margin-bottom: 0;">
+                            <div class="panel-header"><div class="panel-title">Stealth Mode</div>
+                                <label class="toggle-switch"><input type="checkbox"><span class="slider"></span></label>
+                            </div>
+                            <p style="color: var(--text-muted); font-size: 0.9rem;">Hide server ports from external scanners.</p>
+                        </div>
+                    </div>
+                    <div class="glass panel">
+                        <div class="panel-header">
+                            <div class="panel-title">IP Blacklist</div>
+                        </div>
+                        <div class="input-group" style="max-width: 600px;">
+                            <input type="text" class="input-control" placeholder="IP Address (e.g., 203.0.113.5)">
+                            <input type="text" class="input-control" placeholder="Reason">
+                            <button class="btn btn-primary" style="width: auto;" onclick="showToast('IP added to blacklist', 'success')">Ban IP</button>
+                        </div>
+                        <div class="table-responsive">
+                            <table>
+                                <thead><tr><th>IP Address</th><th>Reason</th><th>Added By</th><th>Actions</th></tr></thead>
+                                <tbody>
+                                    <tr><td>45.22.19.100</td><td>Scraping API</td><td>Auto-Defender</td><td><button class="btn-sm btn-danger">Remove</button></td></tr>
+                                    <tr><td>185.10.10.5</td><td>Brute Force Login</td><td>System</td><td><button class="btn-sm btn-danger">Remove</button></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FEATURE FLAGS SECTION -->
+                <div id="flags" class="section">
+                    <div class="glass panel">
+                        <div class="panel-header"><div class="panel-title">Global Feature Toggles</div></div>
+                        <p style="color: var(--text-muted); margin-bottom: 20px;">Enable or disable core app modules instantly without redeploying.</p>
+                        
+                        <div class="grid-cards">
+                            <div class="glass panel" style="margin:0; padding:16px;">
+                                <div class="panel-header" style="margin:0;"><span style="font-weight:600;">App Cloner Engine</span><label class="toggle-switch"><input type="checkbox" checked onchange="toggleFeature('Cloner', this.checked)"><span class="slider"></span></label></div>
+                            </div>
+                            <div class="glass panel" style="margin:0; padding:16px;">
+                                <div class="panel-header" style="margin:0;"><span style="font-weight:600;">Defender Engine</span><label class="toggle-switch"><input type="checkbox" checked onchange="toggleFeature('Defender', this.checked)"><span class="slider"></span></label></div>
+                            </div>
+                            <div class="glass panel" style="margin:0; padding:16px;">
+                                <div class="panel-header" style="margin:0;"><span style="font-weight:600;">Firewall Engine</span><label class="toggle-switch"><input type="checkbox" checked onchange="toggleFeature('Firewall', this.checked)"><span class="slider"></span></label></div>
+                            </div>
+                            <div class="glass panel" style="margin:0; padding:16px;">
+                                <div class="panel-header" style="margin:0;"><span style="font-weight:600;">Gaming Hub</span><label class="toggle-switch"><input type="checkbox" checked onchange="toggleFeature('Gaming', this.checked)"><span class="slider"></span></label></div>
+                            </div>
+                            <div class="glass panel" style="margin:0; padding:16px;">
+                                <div class="panel-header" style="margin:0;"><span style="font-weight:600;">Marketplace</span><label class="toggle-switch"><input type="checkbox" checked onchange="toggleFeature('Marketplace', this.checked)"><span class="slider"></span></label></div>
+                            </div>
+                            <div class="glass panel" style="margin:0; padding:16px;">
+                                <div class="panel-header" style="margin:0;"><span style="font-weight:600;">Betting Module</span><label class="toggle-switch"><input type="checkbox" onchange="toggleFeature('Betting', this.checked)"><span class="slider"></span></label></div>
+                            </div>
+                            <div class="glass panel" style="margin:0; padding:16px;">
+                                <div class="panel-header" style="margin:0;"><span style="font-weight:600;">AI Assistant</span><label class="toggle-switch"><input type="checkbox" checked onchange="toggleFeature('AI Assistant', this.checked)"><span class="slider"></span></label></div>
+                            </div>
+                            <div class="glass panel" style="margin:0; padding:16px; border-color: rgba(239,68,68,0.5);">
+                                <div class="panel-header" style="margin:0;"><span style="font-weight:600; color:var(--danger)">Maintenance Mode</span><label class="toggle-switch"><input type="checkbox" onchange="toggleFeature('Maintenance Mode', this.checked)"><span class="slider" style="background-color:rgba(239,68,68,0.2)"></span></label></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GAMING SECTION -->
+                <div id="gaming" class="section">
+                    <div class="grid-cards">
+                        <div class="glass stat-card">
+                            <span class="stat-label">Active Players</span>
+                            <span class="stat-value">4,892</span>
+                        </div>
+                        <div class="glass stat-card">
+                            <span class="stat-label">Matches Today</span>
+                            <span class="stat-value">12,450</span>
+                        </div>
+                    </div>
+                    <div class="glass panel">
+                        <div class="panel-header"><div class="panel-title">Live Sessions</div></div>
+                        <div class="table-responsive">
+                            <table>
+                                <thead><tr><th>Game ID</th><th>Title</th><th>Players</th><th>Status</th></tr></thead>
+                                <tbody>
+                                    <tr><td>#GM-8921</td><td>Cyber Racer</td><td>8 / 8</td><td><span class="badge success">In Progress</span></td></tr>
+                                    <tr><td>#GM-8922</td><td>Neon Shooter</td><td>2 / 4</td><td><span class="badge warning">Waiting</span></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- APP CLONER SECTION -->
+                <div id="cloner" class="section">
+                    <div class="glass panel">
+                        <div class="panel-header"><div class="panel-title">Cloner Settings</div></div>
+                        <div style="margin-bottom: 20px;">
+                            <label style="display:block; margin-bottom: 10px; color: var(--text-muted);">Global Max Clones per User: <span id="clone-limit-val" style="color:white; font-weight:bold;">3</span></label>
+                            <input type="range" min="1" max="10" value="3" style="width: 100%; max-width: 400px; accent-color: var(--primary);" oninput="document.getElementById('clone-limit-val').innerText = this.value">
+                        </div>
+                    </div>
+                    <div class="glass panel">
+                        <div class="panel-header"><div class="panel-title">Active Cloned Environments</div></div>
+                        <div class="table-responsive">
+                            <table>
+                                <thead><tr><th>User ID</th><th>App Name</th><th>Container ID</th><th>Resource Usage</th></tr></thead>
+                                <tbody>
+                                    <tr><td>USR-1029</td><td>WhatsApp (Clone 1)</td><td>CT-991A</td><td>45MB RAM</td></tr>
+                                    <tr><td>USR-8821</td><td>Instagram (Work)</td><td>CT-991B</td><td>120MB RAM</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- MARKETPLACE SECTION -->
+                <div id="marketplace" class="section">
+                    <div class="glass panel">
+                        <div class="panel-header">
+                            <div class="panel-title">Pending Listings <span class="badge warning">3</span></div>
+                        </div>
+                        <div class="table-responsive">
+                            <table>
+                                <thead><tr><th>Item</th><th>Seller</th><th>Price</th><th>Date</th><th>Actions</th></tr></thead>
+                                <tbody>
+                                    <tr><td>Neon Sword Skin</td><td>USR-442</td><td>2,000 NEX</td><td>2 mins ago</td>
+                                        <td>
+                                            <button class="btn-sm btn-primary" onclick="showToast('Approved', 'success')">Approve</button>
+                                            <button class="btn-sm btn-danger" onclick="showToast('Rejected', 'error')">Reject</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- REPORTS SECTION -->
+                <div id="reports" class="section">
+                    <div class="glass panel">
+                        <div class="panel-header"><div class="panel-title">User Reports</div></div>
+                        <div class="table-responsive">
+                            <table>
+                                <thead><tr><th>Target User</th><th>Reported By</th><th>Reason</th><th>Status</th><th>Actions</th></tr></thead>
+                                <tbody id="reports-tbody">
+                                    <tr><td>@spammer_01</td><td>@legit_user</td><td>Spam in Global Chat</td><td><span class="badge warning">Pending</span></td>
+                                        <td>
+                                            <button class="btn-sm btn-primary" onclick="openConfirmModal('Ban @spammer_01?', () => showToast('User banned', 'success'))">Ban User</button>
+                                            <button class="btn-sm" style="background: rgba(255,255,255,0.1);" onclick="showToast('Report dismissed', 'success')">Dismiss</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LOGS SECTION -->
+                <div id="logs" class="section">
+                    <div class="glass panel">
+                        <div class="panel-header">
+                            <div class="panel-title">System Logs</div>
+                            <div style="display:flex; gap:10px; align-items:center;">
+                                <label style="font-size: 0.9rem; color:var(--text-muted);"><input type="checkbox" id="auto-scroll" checked> Auto-scroll</label>
+                                <button class="btn-sm" style="background:rgba(255,255,255,0.1);" onclick="clearLogs()">Clear</button>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <input type="text" class="input-control" placeholder="Filter logs (e.g. ERROR, Auth)..." id="log-filter" onkeyup="filterLogs()">
+                        </div>
+                        <div class="log-viewer" id="log-viewer">
+                            <!-- Logs generated by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ANNOUNCEMENTS SECTION -->
+                <div id="announcements" class="section">
+                    <div class="glass panel">
+                        <div class="panel-header"><div class="panel-title">Create Announcement</div></div>
+                        <div style="display: flex; flex-direction: column; gap: 15px; max-width: 600px;">
+                            <input type="text" class="input-control" placeholder="Title">
+                            <textarea class="input-control" rows="4" placeholder="Message body..."></textarea>
+                            <button class="btn btn-primary" style="width: max-content;" onclick="showToast('Announcement sent to all users', 'success')">Send Broadcast</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Placeholder sections for missing nav items -->
+                <div id="chat" class="section"><div class="glass panel"><div class="panel-title">Chat Administration Module (In Development)</div></div></div>
+                <div id="calls" class="section"><div class="glass panel"><div class="panel-title">Calls & WebRTC Metrics (In Development)</div></div></div>
+
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // State
+        let currentToken = localStorage.getItem('nex_admin_token') || null;
+        const apiBase = '/api/v1';
+
+        // Elements
+        const loginScreen = document.getElementById('login-screen');
+        const loginBox = document.getElementById('login-box');
+        const loginError = document.getElementById('login-error');
+        const appLayout = document.getElementById('app-layout');
+        const navLinks = document.querySelectorAll('.nav-link');
+        const sections = document.querySelectorAll('.section');
+        const titleEl = document.getElementById('current-section-title');
+        
+        // Init
+        window.onload = () => {
+            if (currentToken) {
+                showApp();
+                loadDashboardData();
+            } else {
+                loginScreen.style.opacity = '1';
+                loginScreen.style.visibility = 'visible';
+                appLayout.style.display = 'none';
+            }
+            initCanvasChart();
+            generateMockLogs();
+        };
+
+        // Navigation
+        navLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                navLinks.forEach(l => l.classList.remove('active'));
+                link.classList.add('active');
+                
+                const targetId = link.getAttribute('data-target');
+                sections.forEach(s => s.classList.remove('active'));
+                const targetSec = document.getElementById(targetId);
+                if(targetSec) targetSec.classList.add('active');
+                
+                titleEl.textContent = link.querySelector('span').textContent;
+
+                if(targetId === 'users') loadUsers();
+            });
+        });
+
+        // Authentication
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('login-username').value;
+            const pass = document.getElementById('login-password').value;
+            loginError.style.display = 'none';
+            loginBox.classList.remove('shake');
+
+            try {
+                const res = await fetch(`${apiBase}/admin/login`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ username, password: pass })
+                });
+                
+                const data = await res.json();
+                
+                if (res.ok && data.success) {
+                    currentToken = data.data.token;
+                    localStorage.setItem('nex_admin_token', currentToken);
+                    showApp();
+                    showToast('Login successful', 'success');
+                    loadDashboardData();
+                } else {
+                    throw new Error(data.message || 'Invalid credentials');
+                }
+            } catch (err) {
+                loginError.style.display = 'block';
+                loginError.textContent = err.message || 'Invalid credentials';
+                loginBox.classList.add('shake');
+                setTimeout(() => loginBox.classList.remove('shake'), 400);
+            }
+        });nimation
+                void loginBox.offsetWidth;
+                loginBox.classList.add('shake');
+    
+    
+
+        function logout() {
+            localStorage.removeItem('nex_admin_token');
+            currentToken = null;
+            appLayout.style.display = 'none';
+            loginScreen.style.visibility = 'visible';
+            loginScreen.style.opacity = '1';
+        }
+
+        function showApp() {
+            loginScreen.style.opacity = '0';
+            setTimeout(() => {
+                loginScreen.style.visibility = 'hidden';
+                appLayout.style.display = 'flex';
+            }, 500);
+        }
+
+        // Dashboard Data (Mock API)
+        async function loadDashboardData() {
+            const mockData = {
+                users: '142,893', sessions: '12,401', msgs: '8.4M', 
+                threats: '1,204', games: '482', reports: '15'
+            };
+            
+            document.getElementById('stat-users').textContent = mockData.users;
+            document.getElementById('stat-sessions').textContent = mockData.sessions;
+            document.getElementById('stat-msgs').textContent = mockData.msgs;
+            document.getElementById('stat-threats').textContent = mockData.threats;
+            document.getElementById('stat-games').textContent = mockData.games;
+            document.getElementById('stat-reports').textContent = mockData.reports;
+        }
+
+        // Users Management
+        async function loadUsers() {
+            const tbody = document.getElementById('users-tbody');
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Loading users...</td></tr>';
+            
+            // Mock Fetch
+            setTimeout(() => {
+                const mockUsers = [
+                    { name: 'Alice Smith', email: 'alice@ex.com', role: 'admin', status: 'Active', date: '2023-01-10' },
+                    { name: 'Bob Jones', email: 'bob@ex.com', role: 'user', status: 'Active', date: '2023-05-22' },
+                    { name: 'Charlie D.', email: 'charlie@ex.com', role: 'user', status: 'Banned', date: '2023-08-11' }
+                ];
+                
+                tbody.innerHTML = mockUsers.map(u => `
+                    <tr>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <div class="avatar" style="width:30px;height:30px;font-size:0.8rem;">${u.name.charAt(0)}</div>
+                                ${u.name}
+                            </div>
+                        </td>
+                        <td>${u.email}</td>
+                        <td><span class="badge" style="background: rgba(255,255,255,0.1);">${u.role.toUpperCase()}</span></td>
+                        <td><span class="badge ${u.status === 'Active' ? 'success' : 'danger'}">${u.status}</span></td>
+                        <td>${u.date}</td>
+                        <td>
+                            <button class="btn-sm btn-primary" onclick="showToast('Role updated', 'success')">Change Role</button>
+                            ${u.status === 'Active' 
+                                ? `<button class="btn-sm btn-danger" onclick="openConfirmModal('Ban ${u.name}?', () => showToast('User banned', 'success'))">Ban</button>`
+                                : `<button class="btn-sm" style="background:var(--success);" onclick="showToast('User unbanned', 'success')">Unban</button>`}
+                        </td>
+                    </tr>
+                `).join('');
+            }, 500);
+        }
+
+        // Features Toggle
+        function toggleFeature(name, state) {
+            showToast(`${name} ${state ? 'Enabled' : 'Disabled'}`, state ? 'success' : 'warning');
+        }
+
+        // Toast System
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `<div>${message}</div>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                toast.style.transition = 'all 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Modal System
+        let currentModalCallback = null;
+        function openConfirmModal(text, callback) {
+            document.getElementById('modal-text').textContent = text;
+            currentModalCallback = callback;
+            document.getElementById('modal-overlay').style.display = 'flex';
+        }
+        function closeModal() {
+            document.getElementById('modal-overlay').style.display = 'none';
+            currentModalCallback = null;
+        }
+        document.getElementById('modal-confirm-btn').addEventListener('click', () => {
+            if(currentModalCallback) currentModalCallback();
+            closeModal();
+        });
+
+        // Logs Simulator
+        let logInterval;
+        function generateMockLogs() {
+            const viewer = document.getElementById('log-viewer');
+            const types = ['INFO', 'INFO', 'INFO', 'WARN', 'ERROR'];
+            const msgs = ['User login successful', 'API Rate limit approaching', 'Failed auth attempt', 'Database query slow', 'New session created', 'File upload blocked by Defender'];
+            
+            function addLog() {
+                const type = types[Math.floor(Math.random() * types.length)];
+                const msg = msgs[Math.floor(Math.random() * msgs.length)];
+                const time = new Date().toISOString();
+                const div = document.createElement('div');
+                div.className = `log-line log-${type}`;
+                div.textContent = `[${time}] [${type}] ${msg} - IP: 192.168.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}`;
+                viewer.appendChild(div);
+                
+                if(document.getElementById('auto-scroll').checked) {
+                    viewer.scrollTop = viewer.scrollHeight;
+                }
+                
+                // Keep max 100 lines
+                if(viewer.children.length > 100) viewer.removeChild(viewer.firstChild);
+            }
+            
+            for(let i=0; i<20; i++) addLog(); // initial
+            logInterval = setInterval(addLog, 2000);
+        }
+        function clearLogs() { document.getElementById('log-viewer').innerHTML = ''; }
+        function filterLogs() {
+            const term = document.getElementById('log-filter').value.toLowerCase();
+            const lines = document.querySelectorAll('.log-line');
+            lines.forEach(line => {
+                line.style.display = line.textContent.toLowerCase().includes(term) ? 'block' : 'none';
+            });
+        }
+
+        // Simple Canvas Chart (Sine wave mock data)
+        function initCanvasChart() {
+            const canvas = document.getElementById('overviewChart');
+            if(!canvas) return;
+            const ctx = canvas.getContext('2d');
+            
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            function draw() {
+                ctx.clearRect(0, 0, width, height);
+                
+                // Draw Grid
+                ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+                ctx.lineWidth = 1;
+                for(let i=0; i<width; i+=40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, height); ctx.stroke(); }
+                for(let i=0; i<height; i+=40) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(width, i); ctx.stroke(); }
+
+                // Draw Path
+                ctx.beginPath();
+                ctx.moveTo(0, height);
+                
+                const points = [];
+                for(let x=0; x<=width; x+=10) {
+                    const y = height/2 + Math.sin(x/50 + Date.now()/1000) * 40 + Math.random()*10;
+                    points.push({x,y});
+                }
+                
+                ctx.moveTo(points[0].x, points[0].y);
+                for(let i=1; i<points.length; i++) {
+                    ctx.lineTo(points[i].x, points[i].y);
+                }
+                
+                ctx.strokeStyle = 'rgba(139, 92, 246, 1)';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                
+                // Gradient Fill
+                ctx.lineTo(width, height);
+                ctx.lineTo(0, height);
+                const grad = ctx.createLinearGradient(0,0,0,height);
+                grad.addColorStop(0, 'rgba(139, 92, 246, 0.4)');
+                grad.addColorStop(1, 'rgba(139, 92, 246, 0)');
+                ctx.fillStyle = grad;
+                ctx.fill();
+                
+                requestAnimationFrame(draw);
+            }
+            draw();
+        }
+
+        // Fetch Wrapper Utility (For actual backend usage)
+        async function apiFetch(endpoint, options = {}) {
+            const token = localStorage.getItem('nex_admin_token');
+            const headers = {
+                'Content-Type': 'application/json',
+                ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+                ...(options.headers || {})
+            };
+            
+            const response = await fetch(`${apiBase}${endpoint}`, { ...options, headers });
+            if (!response.ok) {
+                if(response.status === 401) logout();
+                throw new Error(`API Error: ${response.status}`);
+            }
+            return response.json();
+        }
+    </script>
+</body>
+</html>
