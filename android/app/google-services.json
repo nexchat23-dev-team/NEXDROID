@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "326402290382",
+    "firebase_url": "https://nex-app-63ffb-default-rtdb.firebaseio.com",
+    "project_id": "nex-app-63ffb",
+    "storage_bucket": "nex-app-63ffb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:326402290382:android:17467d89fc4d8053cf969f",
+        "android_client_info": {
+          "package_name": "nexotech.nexapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "326402290382-5lem9c04ub2h8q0s5q9o2o9l7f2b0nmv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "nexotech.nexapp",
+            "certificate_hash": "2802bc573f72ff07cb5a9cb46f663986945dd9a0"
+          }
+        },
+        {
+          "client_id": "326402290382-4upr15q7leh0ofgljp6bt9lt1h8aaokv.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCwN9YSxFJjgDZa2WGkRXyzxc3gcG50_HI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "326402290382-4upr15q7leh0ofgljp6bt9lt1h8aaokv.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
