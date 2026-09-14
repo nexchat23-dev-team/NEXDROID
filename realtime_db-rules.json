@@ -1,0 +1,199 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "users": {
+      ".read": "auth != null",
+      ".indexOn": ["username", "email"],
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && (auth.uid === $uid || auth.uid != null)"
+      }
+    },
+    "presence": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && (auth.uid === $uid || auth.uid != null)"
+      }
+    },
+    "logged_users": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "statuses": {
+      ".read": "auth != null",
+      ".indexOn": ["isActive", "userId", "createdAt"],
+      "$statusId": {
+        ".write": "auth != null"
+      }
+    },
+    "statusViews": {
+      ".read": "auth != null",
+      "$viewId": {
+        ".write": "auth != null"
+      }
+    },
+    "statusReactions": {
+      ".read": "auth != null",
+      "$reactionId": {
+        ".write": "auth != null"
+      }
+    },
+    "conversations": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["createdAt", "lastMessageTime", "createdBy", "isGroup"]
+    },
+    "calls": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["callerId", "receiverId", "recipientId", "status", "createdAt", "timestamp"],
+      "$callId": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        "reactions": {
+          ".read": "auth != null",
+          ".write": "auth != null"
+        },
+        "iceCandidates": {
+          ".read": "auth != null",
+          ".write": "auth != null"
+        }
+      }
+    },
+    "messages": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["conversationId", "createdAt", "senderId"]
+    },
+    "message_requests": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["fromId", "toId", "status"]
+    },
+    "blocked_users": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["blockerId", "blockedId"]
+    },
+    "muted_chats": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["userId", "conversationId"]
+    },
+    "chat_locks": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["userId", "conversationId"]
+    },
+    "chat_favourites": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["userId", "conversationId"]
+    },
+    "user_reports": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["reportedBy", "targetUserId"]
+    },
+    "group_reports": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["reportedBy", "conversationId"]
+    },
+    "join_requests": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["conversationId", "userId", "status"]
+    },
+
+    "gaming_presence": {
+      ".read": "auth != null",
+      ".indexOn": ["status", "currentGame", "lastSeen", "timestamp"],
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+
+    "gaming_lobbies": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["gameName", "status", "hostId", "createdAt"],
+      "$lobbyId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+
+    "gaming_matchmaking": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["gameName", "status", "skill", "createdAt"],
+      "$queueId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+
+    "gaming_sessions": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["gameName", "status", "createdAt"],
+      "$sessionId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+
+    "gaming_challenges": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["challengerId", "challengedId", "status", "createdAt"],
+      "$challengeId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+
+    "gaming_leaderboards": {
+      ".read": "auth != null",
+      "$gameName": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        ".indexOn": ["score", "submittedAt"]
+      }
+    },
+
+    "gaming_stats": {
+      ".read": "auth != null",
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+
+    "bets": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+
+    "user_bets": {
+      ".read": "auth != null",
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+
+    "token_transactions": {
+      ".read": "auth != null",
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    }
+  }
+}

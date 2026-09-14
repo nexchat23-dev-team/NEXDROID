@@ -1,0 +1,14 @@
+{
+  "database": {
+    "rules": "realtime_db-rules.json"
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "emulators": {
+    "database": {
+      "host": "127.0.0.1",
+      "port": 9005
+    }
+  }
+}

@@ -1,0 +1,128 @@
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+
+# Android related
+**/android/**/gradle-wrapper.jar
+**/android/.gradle
+**/android/captures/
+**/android/gradlew
+**/android/gradlew.bat
+**/android/local.properties
+**/android/**/GeneratedPluginRegistrant.java
+
+# iOS/XCode related
+**/ios/**/*.mode1v3
+**/ios/**/*.mode2v3
+**/ios/**/*.moved-aside
+**/ios/**/*.pbxuser
+**/ios/**/*.perspectivev3
+**/ios/**/.sconsign.dblite
+**/ios/**/DerivedData/
+**/ios/**/Icon?
+**/ios/**/Pods/
+**/ios/**/symroot/
+**/ios/**/xcuserdata/
+**/ios/.generated/
+**/ios/Flutter/App.framework
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/app.flx
+**/ios/Flutter/app.zip
+**/ios/Flutter/flutter_assets/
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Flutter/generated_plugin_registrant.*
+**/ios/Flutter/generated_xcconfig/
+
+# Web related
+lib/generated_plugin_registrant.dart
+
+# Windows related
+**/windows/**/*.exe
+**/windows/**/*.dll
+**/windows/**/*.so
+**/windows/**/*.pdb
+**/windows/**/GeneratedPluginRegistrant.cpp
+**/windows/flutter/generated_plugin_registrant.*
+**/windows/flutter/generated_plugins.cmake
+
+# Linux related
+**/linux/**/libflutter_linux_gtk.so
+**/linux/**/GeneratedPluginRegistrant.cc
+**/linux/**/flutter/generated_plugin_registrant.*
+**/linux/**/flutter/generated_plugins.cmake
+
+# macOS related
+**/macos/Flutter/ephemeral/
+**/macos/Flutter/Flutter-Debug.xcconfig
+**/macos/Flutter/Flutter-Release.xcconfig
+**/macos/Flutter/Flutter-Profile.xcconfig
+**/macos/Flutter/generated_plugin_registrant.*
+**/macos/**/Pods/
+**/macos/**/DerivedData/
+**/macos/**/.symlinks/
+**/macos/**/xcuserdata/
+
+# Exceptions to above rules.
+!**/android/**/src/androidTest/**/robolectric.properties
+
+# Miscellaneous
+**/.DS_Store
+**/.classpath
+**/.project
+**/.settings/
+**/*.iml
+**/*.ipr
+**/*.iws
+**/.idea/
+**/.vscode/
+**/.kotlin/
+**/cmake-build-*/
+
+# IntelliJ/Android Studio
+.idea/
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/gradle.xml
+.idea/dictionaries
+.idea/libraries
+.idea/caches
+.idea/modules.xml
+.idea/misc.xml
+.idea/modules
+*.iml
+*.ipr
+
+# VS Code
+.vscode/
+
+firestore-debug.log
+
+# Local environment
+.env
+.env.local
+
+# Test coverage
+coverage/
+
+# Logs & Temp Artifacts
+*.log
+build_*.txt
+analyze_*.txt
+analyzer_issues.txt
+temp_*.ps1
+temp_*.txt
+tempcheck.dart
+inconsistent_jvm_context.txt
+flutter_analyze_output.txt
+deps.txt
+outdated.json
+windows/flutter/ephemeral/

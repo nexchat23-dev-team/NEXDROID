@@ -1,0 +1,2699 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================================================================
+    // SECTION 1: GLOBAL AUTHENTICATION & ROLE-BASED ACCESS CONTROL (RBAC)
+    // =========================================================================
+
+    // Basic authentication: returns true if a user is authenticated with Firebase Auth
+    function isSignedIn() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    // Document ownership: returns true if authenticated user's UID matches parameter
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Custom Claim Role check: tests custom claim attributes inside auth token
+    function hasRoleClaim(role) {
+      return isSignedIn() && (
+        request.auth.token.get('role', '') == role ||
+        request.auth.token.get(role, false) == true
+      );
+    }
+
+    // Administrator custom claim check
+    function hasAdminClaim() {
+      return isSignedIn() && (
+        request.auth.token.get('admin', false) == true ||
+        request.auth.token.get('role', '') == 'admin'
+      );
+    }
+
+    // SuperAdmin check: verifies superadmin token claim or root admin email allowlist
+    function isSuperAdmin() {
+      return isSignedIn() && (
+        request.auth.token.get('superadmin', false) == true ||
+        request.auth.token.get('role', '') == 'superadmin' ||
+        request.auth.token.get('email', '') in ['demonalexander526@gmail.com']
+      );
+    }
+
+    // Primary Platform Administrator verification
+    function isAdmin() {
+      return isSuperAdmin() || hasAdminClaim();
+    }
+
+    // Moderator role verification for trust & safety enforcement
+    function isModerator() {
+      return isAdmin() || hasRoleClaim('moderator');
+    }
+
+    // Customer Support Agent verification
+    function isSupportAgent() {
+      return isAdmin() || hasRoleClaim('support');
+    }
+
+    // Verified User verification (phone, email, or KYC verified)
+    function isVerifiedUser() {
+      return isSignedIn() && (
+        request.auth.token.get('email_verified', false) == true ||
+        request.auth.token.get('phone_verified', false) == true ||
+        request.auth.token.get('verified', false) == true
+      );
+    }
+
+    // Document owner or platform admin permission check
+    function isOwnerOrAdmin(uid) {
+      return isOwner(uid) || isAdmin();
+    }
+
+    // Document owner or platform moderator permission check
+    function isOwnerOrModerator(uid) {
+      return isOwner(uid) || isModerator();
+    }
+
+    // Helper to verify user is active and not blocked
+    function isActiveUser() {
+      return isSignedIn() && !hasRoleClaim('banned') && !hasRoleClaim('suspended');
+    }
+
+
+    // =========================================================================
+    // SECTION 2: PRIMITIVE TYPE VALIDATION & DATA INTEGRITY HELPERS
+    // =========================================================================
+
+    function isString(val) {
+      return val is string;
+    }
+
+    function isNonEmptyString(val) {
+      return val is string && val.size() > 0;
+    }
+
+    function isStringLength(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    function isNumber(val) {
+      return val is number;
+    }
+
+    function isInt(val) {
+      return val is int;
+    }
+
+    function isPositiveInt(val) {
+      return val is int && val > 0;
+    }
+
+    function isNonNegativeInt(val) {
+      return val is int && val >= 0;
+    }
+
+    function isPositiveNumber(val) {
+      return val is number && val > 0;
+    }
+
+    function isNonNegativeNumber(val) {
+      return val is number && val >= 0;
+    }
+
+    function isBool(val) {
+      return val is bool;
+    }
+
+    function isTimestamp(val) {
+      return val is timestamp;
+    }
+
+    function isList(val) {
+      return val is list;
+    }
+
+    function isMap(val) {
+      return val is map;
+    }
+
+    function hasFields(requiredFields) {
+      return request.resource.data.keys().hasAll(requiredFields);
+    }
+
+    function hasOnlyFields(allowedFields) {
+      return request.resource.data.keys().hasOnly(allowedFields);
+    }
+
+    function hasAnyField(checkFields) {
+      return request.resource.data.keys().hasAny(checkFields);
+    }
+
+    function isValidTimestampString(val) {
+      return val is string && val.size() >= 10;
+    }
+
+    function isTimestampOrIsoString(val) {
+      return isTimestamp(val) || isValidTimestampString(val);
+    }
+
+
+    // =========================================================================
+    // SECTION 3: LIFECYCLE, TIME & RATE-LIMITING VALIDATION HELPERS
+    // =========================================================================
+
+    function isCreation() {
+      return resource == null;
+    }
+
+    function isUpdate() {
+      return resource != null;
+    }
+
+    function isDeletion() {
+      return request.resource == null;
+    }
+
+    function isNowOrPast(field) {
+      return (field in request.resource.data) &&
+        request.resource.data[field] is timestamp &&
+        request.resource.data[field] <= request.time;
+    }
+
+    function isFuture(field) {
+      return (field in request.resource.data) &&
+        request.resource.data[field] is timestamp &&
+        request.resource.data[field] >= request.time;
+    }
+
+    function isRecentTimestamp(field, maxSkewSeconds) {
+      return (field in request.resource.data) &&
+        request.resource.data[field] is timestamp &&
+        request.resource.data[field] <= request.time &&
+        request.resource.data[field] >= request.time - duration.value(maxSkewSeconds, 's');
+    }
+
+    function isRecentOrNow(field) {
+      return isRecentTimestamp(field, 300) ||
+        ((field in request.resource.data) && request.resource.data[field] == request.time);
+    }
+
+    function fieldUnchanged(field) {
+      return resource == null ||
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny([field]) ||
+        request.resource.data.get(field, null) == resource.data.get(field, null);
+    }
+
+    function fieldChanged(field) {
+      return resource != null &&
+        request.resource.data.get(field, null) != resource.data.get(field, null);
+    }
+
+    function onlyFieldsUpdated(allowedFields) {
+      return resource != null &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowedFields);
+    }
+
+    function cannotUpdateFields(protectedFields) {
+      return resource == null ||
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(protectedFields);
+    }
+
+
+    // =========================================================================
+    // SECTION 4: USER ACCOUNTS, PROFILES & PREFERENCES
+    // =========================================================================
+
+    function isValidUserCreate(uid) {
+      return isOwner(uid) &&
+        hasFields(['email', 'username']) &&
+        isNonEmptyString(request.resource.data.email) &&
+        isNonEmptyString(request.resource.data.username) &&
+        (!('token_balance' in request.resource.data) || isNonNegativeInt(request.resource.data.token_balance)) &&
+        (!('tokenBalance' in request.resource.data) || isNonNegativeInt(request.resource.data.tokenBalance)) &&
+        (!('role' in request.resource.data) || request.resource.data.role == 'user' || isAdmin());
+    }
+
+    function isValidUserUpdate(uid) {
+      return (isOwner(uid) || isAdmin()) &&
+        (!('role' in request.resource.data) || isAdmin() || fieldUnchanged('role')) &&
+        (!('email' in request.resource.data) || isNonEmptyString(request.resource.data.email)) &&
+        (!('token_balance' in request.resource.data) || isNonNegativeInt(request.resource.data.token_balance) || isAdmin()) &&
+        (!('tokenBalance' in request.resource.data) || isNonNegativeInt(request.resource.data.tokenBalance) || isAdmin());
+    }
+
+    // Core User Documents (/users/{uid})
+    match /users/{uid} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isValidUserCreate(uid);
+      allow update: if isValidUserUpdate(uid);
+      allow delete: if isOwnerOrAdmin(uid);
+
+      // User Subcollection: Conversation specific settings
+      match /chatSettings/{convId} {
+        allow get, list: if isOwner(uid) || isAdmin();
+        allow create, update, delete: if isOwner(uid) || isAdmin();
+      }
+
+      // User Subcollection: General custom settings
+      match /settings/{settingId} {
+        allow get, list: if isOwner(uid) || isAdmin();
+        allow create, update, delete: if isOwner(uid) || isAdmin();
+      }
+
+      // User Subcollection: Login sessions & security auth records
+      match /sessions/{sessionId} {
+        allow get, list: if isOwner(uid) || isAdmin();
+        allow create, update, delete: if isOwner(uid) || isAdmin();
+      }
+
+      // User Subcollection: Private identity & security data
+      match /private/{docId} {
+        allow get, list: if isOwner(uid) || isAdmin();
+        allow create, update, delete: if isOwner(uid) || isAdmin();
+      }
+
+      // User Subcollection: Installed application sandbox data
+      match /installedApps/{appId} {
+        allow get, list: if isOwner(uid) || isAdmin();
+        allow create, update, delete: if isOwner(uid) || isAdmin();
+      }
+
+      // User Subcollection: Stored contact references
+      match /contacts/{contactId} {
+        allow get, list: if isOwner(uid) || isAdmin();
+        allow create, update, delete: if isOwner(uid) || isAdmin();
+      }
+
+      // User Subcollection: User notifications inbox
+      match /notifications/{notificationId} {
+        allow get, list: if isOwner(uid) || isAdmin();
+        allow create: if isSignedIn();
+        allow update, delete: if isOwner(uid) || isAdmin();
+      }
+
+      // User Subcollection: Bookmarked reels and videos
+      match /bookmarks/{bookmarkId} {
+        allow get, list: if isOwner(uid) || isAdmin();
+        allow create, update, delete: if isOwner(uid) || isAdmin();
+      }
+
+      // User Subcollection: User activity log events
+      match /activityLog/{logId} {
+        allow get, list: if isOwner(uid) || isAdmin();
+        allow create: if isOwner(uid) || isAdmin();
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    // Secondary Public User Profiles Directory (/profiles/{uid})
+    match /profiles/{uid} {
+      allow get, list: if isSignedIn();
+      allow create: if isOwner(uid);
+      allow update: if isOwnerOrAdmin(uid);
+      allow delete: if isOwnerOrAdmin(uid);
+    }
+
+    // User Settings Collection (/userSettings/{uid})
+    match /userSettings/{uid} {
+      allow get, list: if isSignedIn() && (isOwner(uid) || isAdmin());
+      allow create, update, delete: if isOwner(uid) || isAdmin();
+    }
+
+    // Profile Settings Collection (/profileSettings/{uid})
+    match /profileSettings/{uid} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isOwner(uid) || isAdmin();
+    }
+
+    // Chat Settings Collection (/chatSettings/{uid})
+    match /chatSettings/{uid} {
+      allow get, list: if isOwner(uid) || isAdmin();
+      allow create, update, delete: if isOwner(uid) || isAdmin();
+    }
+
+    // Call Settings Collection (/callSettings/{uid})
+    match /callSettings/{uid} {
+      allow get, list: if isOwner(uid) || isAdmin();
+      allow create, update, delete: if isOwner(uid) || isAdmin();
+    }
+
+    // Privacy Settings Collection (/privacySettings/{uid})
+    match /privacySettings/{uid} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isOwner(uid) || isAdmin();
+    }
+
+    // Notification Settings Collection (/notificationSettings/{uid})
+    match /notificationSettings/{uid} {
+      allow get, list: if isOwner(uid) || isAdmin();
+      allow create, update, delete: if isOwner(uid) || isAdmin();
+    }
+
+    // Theme Settings Collection (/themeSettings/{uid})
+    match /themeSettings/{uid} {
+      allow get, list: if isOwner(uid) || isAdmin();
+      allow create, update, delete: if isOwner(uid) || isAdmin();
+    }
+
+    // User Preferences Collection (/userPreferences/{uid})
+    match /userPreferences/{uid} {
+      allow get, list: if isOwner(uid) || isAdmin();
+      allow create, update, delete: if isOwner(uid) || isAdmin();
+    }
+
+    // Device Tokens for FCM Push Notifications (/deviceTokens/{uid})
+    match /deviceTokens/{uid} {
+      allow get, list: if isOwner(uid) || isAdmin();
+      allow create, update, delete: if isOwner(uid) || isAdmin();
+
+      match /tokens/{tokenId} {
+        allow get, list: if isOwner(uid) || isAdmin();
+        allow create, update, delete: if isOwner(uid) || isAdmin();
+      }
+    }
+
+    // Real-Time Online Presence Registry (/presence/{uid})
+    match /presence/{uid} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isOwner(uid) || isAdmin();
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+
+    // Logged In Users Registry (/logged_users/{uid})
+    match /logged_users/{uid} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isOwner(uid) || isAdmin();
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+
+
+    // =========================================================================
+    // SECTION 5: DIRECT MESSAGING, GROUP CHATS & CONVERSATIONS ENGINE
+    // =========================================================================
+
+    function isConversationParticipant(convData) {
+      return isSignedIn() &&
+        ('participants' in convData) &&
+        convData.participants is list &&
+        request.auth.uid in convData.participants;
+    }
+
+    function isConversationAdmin(convData) {
+      return isSignedIn() && (
+        (('admins' in convData) && convData.admins is list && request.auth.uid in convData.admins) ||
+        convData.get('createdBy', '') == request.auth.uid ||
+        convData.get('creatorId', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    function isValidConversationCreate() {
+      return isSignedIn() && (
+        (
+          ('participants' in request.resource.data) &&
+          request.resource.data.participants is list &&
+          request.auth.uid in request.resource.data.participants
+        ) ||
+        request.resource.data.get('createdBy', '') == request.auth.uid ||
+        request.resource.data.get('creatorId', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    function isValidConversationUpdate() {
+      return isSignedIn() && (
+        resource == null ||
+        !('participants' in resource.data) ||
+        isConversationParticipant(resource.data) ||
+        isConversationAdmin(resource.data) ||
+        (
+          'participants' in request.resource.data &&
+          request.resource.data.participants is list &&
+          request.auth.uid in request.resource.data.participants
+        ) ||
+        isAdmin()
+      );
+    }
+
+    function isValidMessageCreate() {
+      return isSignedIn() && (
+        request.resource.data.get('senderId', '') == request.auth.uid ||
+        request.resource.data.get('sender_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Direct & Group Conversations (/conversations/{conversationId})
+    match /conversations/{conversationId} {
+      allow create: if isValidConversationCreate();
+      allow get, list: if isSignedIn() && (
+        resource == null ||
+        !('participants' in resource.data) ||
+        isConversationParticipant(resource.data) ||
+        resource.data.get('isGroup', false) == true ||
+        isAdmin()
+      );
+      allow update: if isValidConversationUpdate();
+      allow delete: if isSignedIn() && (
+        resource == null ||
+        isConversationAdmin(resource.data) ||
+        isConversationParticipant(resource.data) ||
+        isAdmin()
+      );
+
+      // Subcollection Messages
+      match /messages/{messageId} {
+        allow get, list: if isSignedIn();
+        allow create: if isValidMessageCreate();
+        allow update: if isSignedIn() && (
+          resource == null ||
+          resource.data.get('senderId', '') == request.auth.uid ||
+          resource.data.get('sender_id', '') == request.auth.uid ||
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy', 'reactions', 'deliveredTo', 'updatedAt']) ||
+          isAdmin()
+        );
+        allow delete: if isSignedIn() && (
+          resource == null ||
+          resource.data.get('senderId', '') == request.auth.uid ||
+          resource.data.get('sender_id', '') == request.auth.uid ||
+          isAdmin()
+        );
+      }
+
+      // Subcollection Typing Indicators
+      match /typing/{userId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isOwner(userId) || isAdmin();
+      }
+
+      // Subcollection Pinned Messages
+      match /pinned/{messageId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+
+      // Subcollection In-Chat Polls
+      match /polls/{pollId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+
+        match /votes/{voteId} {
+          allow get, list: if isSignedIn();
+          allow create, update, delete: if isSignedIn();
+        }
+      }
+
+      // Subcollection Media Attachments
+      match /media/{mediaId} {
+        allow get, list: if isSignedIn();
+        allow create: if isSignedIn();
+        allow update, delete: if isSignedIn();
+      }
+
+      // Subcollection Pinned Notes
+      match /notes/{noteId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+    }
+
+    // Flat Messages Collection (/messages/{messageId})
+    match /messages/{messageId} {
+      allow create: if isValidMessageCreate();
+      allow get, list: if isSignedIn();
+      allow update: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('senderId', '') == request.auth.uid ||
+        resource.data.get('sender_id', '') == request.auth.uid ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy', 'deliveredTo', 'reactions', 'last_updated', 'updatedAt']) ||
+        isAdmin()
+      );
+      allow delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('senderId', '') == request.auth.uid ||
+        resource.data.get('sender_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Message Reactions (/messageReactions/{reactionId})
+    match /messageReactions/{reactionId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        request.resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow update, delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Chat Biometric/PIN Locks (/chatLocks/{lockId})
+    match /chatLocks/{lockId} {
+      allow create, update: if isSignedIn() && (
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Starred / Favourite Conversations (/chatFavourites/{favId})
+    match /chatFavourites/{favId} {
+      allow create, update: if isSignedIn() && (
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Muted Conversations Registry (/mutedChats/{muteId})
+    match /mutedChats/{muteId} {
+      allow create, update: if isSignedIn() && (
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Group Join Requests (/joinRequests/{requestId})
+    match /joinRequests/{requestId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        request.resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow update, delete: if isSignedIn();
+    }
+
+    // Direct Message Privacy Contact Requests (/messageRequests/{requestId})
+    match /messageRequests/{requestId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('fromId', '') == request.auth.uid ||
+        request.resource.data.get('from_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('fromId', '') == request.auth.uid ||
+        resource.data.get('toId', '') == request.auth.uid ||
+        resource.data.get('from_id', '') == request.auth.uid ||
+        resource.data.get('to_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow update, delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('fromId', '') == request.auth.uid ||
+        resource.data.get('toId', '') == request.auth.uid ||
+        resource.data.get('from_id', '') == request.auth.uid ||
+        resource.data.get('to_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Blocked Users Registry (/blockedUsers/{blockId})
+    match /blockedUsers/{blockId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('blockerId', '') == request.auth.uid ||
+        request.resource.data.get('blocker_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('blockerId', '') == request.auth.uid ||
+        resource.data.get('blockedId', '') == request.auth.uid ||
+        resource.data.get('blocker_id', '') == request.auth.uid ||
+        resource.data.get('blocked_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow update, delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('blockerId', '') == request.auth.uid ||
+        resource.data.get('blocker_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+
+    // =========================================================================
+    // SECTION 6: STATUS / STORIES & EPHEMERAL MEDIA
+    // =========================================================================
+
+    function isValidStatusCreate() {
+      return isSignedIn() && (
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        request.resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    function isValidStatusOwner() {
+      return isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // 24-Hour Ephemeral Stories (/statuses/{statusId})
+    match /statuses/{statusId} {
+      allow create: if isValidStatusCreate();
+      allow get, list: if isSignedIn();
+      allow update: if isSignedIn() && (
+        isValidStatusOwner() ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'viewers', 'updatedAt', 'reactions'])
+      );
+      allow delete: if isValidStatusOwner();
+
+      match /views/{viewId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+
+      match /reactions/{reactionId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+
+      match /replies/{replyId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+    }
+
+    // Flat Status Views Collection (/statusViews/{viewId})
+    match /statusViews/{viewId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        request.resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow update, delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Flat Status Reactions Collection (/statusReactions/{reactionId})
+    match /statusReactions/{reactionId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        request.resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow update, delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Status Direct Replies (/statusReplies/{replyId})
+    match /statusReplies/{replyId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('senderId', '') == request.auth.uid ||
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow update, delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('senderId', '') == request.auth.uid ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+
+    // =========================================================================
+    // SECTION 7: WEBRTC CALLING ENGINE (AUDIO & VIDEO)
+    // =========================================================================
+
+    function isCallParticipant(callData) {
+      return isSignedIn() && (
+        callData.get('callerId', '') == request.auth.uid ||
+        callData.get('receiverId', '') == request.auth.uid ||
+        callData.get('recipientId', '') == request.auth.uid ||
+        callData.get('caller_id', '') == request.auth.uid ||
+        callData.get('receiver_id', '') == request.auth.uid
+      );
+    }
+
+    function isValidCallCreate() {
+      return isSignedIn() && (
+        request.resource.data.get('callerId', '') == request.auth.uid ||
+        request.resource.data.get('caller_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // 1-on-1 WebRTC Calls (/calls/{callId})
+    match /calls/{callId} {
+      allow create: if isValidCallCreate();
+      allow get, list: if isSignedIn() && (resource == null || isCallParticipant(resource.data) || isAdmin());
+      allow update: if isSignedIn() && (resource == null || isCallParticipant(resource.data) || isAdmin());
+      allow delete: if isSignedIn() && (resource == null || isCallParticipant(resource.data) || isAdmin());
+
+      // Nested ICE Candidates
+      match /iceCandidates/{candidateId} {
+        allow create: if isSignedIn() && (
+          request.resource.data.get('from', '') == request.auth.uid ||
+          request.resource.data.get('fromId', '') == request.auth.uid ||
+          isAdmin()
+        );
+        allow get, list: if isSignedIn();
+        allow update, delete: if isSignedIn() && (
+          resource == null ||
+          resource.data.get('from', '') == request.auth.uid ||
+          resource.data.get('fromId', '') == request.auth.uid ||
+          isAdmin()
+        );
+      }
+
+      // Nested SDP Session Descriptions
+      match /sdp/{sdpId} {
+        allow create: if isSignedIn() && (
+          request.resource.data.get('from', '') == request.auth.uid ||
+          request.resource.data.get('fromId', '') == request.auth.uid ||
+          isAdmin()
+        );
+        allow get, list: if isSignedIn();
+        allow update, delete: if isSignedIn() && (
+          resource == null ||
+          resource.data.get('from', '') == request.auth.uid ||
+          resource.data.get('fromId', '') == request.auth.uid ||
+          isAdmin()
+        );
+      }
+
+      // Nested Call Reactions (Live AR / Sticker sync)
+      match /reactions/{reactionId} {
+        allow get, list, create, update, delete: if isSignedIn();
+      }
+
+      // Nested Call Events / QoS Telemetry
+      match /events/{eventId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+    }
+
+    // Flat ICE Signaling Collection (/iceCandidates/{candidateId})
+    match /iceCandidates/{candidateId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('from', '') == request.auth.uid ||
+        request.resource.data.get('fromId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow update, delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('from', '') == request.auth.uid ||
+        resource.data.get('fromId', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Flat SDP Signaling Collection (/sdp/{sdpId})
+    match /sdp/{sdpId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('from', '') == request.auth.uid ||
+        request.resource.data.get('fromId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow update, delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('from', '') == request.auth.uid ||
+        resource.data.get('fromId', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Call History Logs (/callHistory/{historyId})
+    match /callHistory/{historyId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('callerId', '') == request.auth.uid ||
+        request.resource.data.get('caller_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('callerId', '') == request.auth.uid ||
+        resource.data.get('receiverId', '') == request.auth.uid ||
+        resource.data.get('recipientId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow update: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('callerId', '') == request.auth.uid ||
+        resource.data.get('receiverId', '') == request.auth.uid ||
+        resource.data.get('recipientId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('callerId', '') == request.auth.uid ||
+        resource.data.get('receiverId', '') == request.auth.uid ||
+        resource.data.get('recipientId', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Multi-Party WebRTC Group Calls (/groupCalls/{groupCallId})
+    match /groupCalls/{groupCallId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('initiatorId', '') == request.auth.uid ||
+        request.resource.data.get('initiator_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('initiatorId', '') == request.auth.uid ||
+        resource.data.get('initiator_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+
+      match /participants/{participantId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+
+      match /signals/{signalId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+    }
+
+    // Flat Group Call Participants Registry (/groupCallParticipants/{participantId})
+    match /groupCallParticipants/{participantId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        request.resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow update, delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+
+    // =========================================================================
+    // SECTION 8: SQUADS & SQUAD MULTIPLAYER GAMING
+    // =========================================================================
+
+    function isSquadMember(squadData) {
+      return isSignedIn() &&
+        ('members' in squadData) &&
+        squadData.members is list &&
+        request.auth.uid in squadData.members;
+    }
+
+    function isSquadLeader(squadData) {
+      return isSignedIn() && (
+        squadData.get('leaderId', '') == request.auth.uid ||
+        squadData.get('leader_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Squads Collection (/squads/{squadId})
+    match /squads/{squadId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('leaderId', '') == request.auth.uid ||
+        request.resource.data.get('leader_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow update: if isSignedIn() && (
+        resource == null ||
+        isSquadMember(resource.data) ||
+        isSquadLeader(resource.data) ||
+        (
+          'members' in request.resource.data &&
+          request.resource.data.members is list &&
+          request.auth.uid in request.resource.data.members
+        ) ||
+        isAdmin()
+      );
+      allow delete: if isSignedIn() && (
+        resource == null ||
+        isSquadLeader(resource.data) ||
+        isAdmin()
+      );
+
+      // Subcollection Squad Members
+      match /members/{memberId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+
+      // Subcollection Squad Messages
+      match /messages/{messageId} {
+        allow get, list: if isSignedIn();
+        allow create: if isSignedIn() && (
+          request.resource.data.get('senderId', '') == request.auth.uid ||
+          isAdmin()
+        );
+        allow update, delete: if isSignedIn() && (
+          resource == null ||
+          resource.data.get('senderId', '') == request.auth.uid ||
+          isAdmin()
+        );
+      }
+
+      // Subcollection Squad Gaming Sessions
+      match /sessions/{sessionId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+
+      // Subcollection Squad Match Stats
+      match /stats/{statId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+    }
+
+    // Flat Squad Messages Collection (/squadMessages/{messageId})
+    match /squadMessages/{messageId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('senderId', '') == request.auth.uid ||
+        request.resource.data.get('sender_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow update, delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('senderId', '') == request.auth.uid ||
+        resource.data.get('sender_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Flat Squad Gaming Sessions Collection (/squadSessions/{sessionId})
+    match /squadSessions/{sessionId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('creatorId', '') == request.auth.uid ||
+        request.resource.data.get('creator_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow update, delete: if isSignedIn();
+    }
+
+    // Squad Invitations (/squadInvites/{inviteId})
+    match /squadInvites/{inviteId} {
+      allow create: if isSignedIn();
+      allow get, list: if isSignedIn();
+      allow update, delete: if isSignedIn();
+    }
+
+
+    // =========================================================================
+    // SECTION 9: CLANS, CLAN WARS & CLAN EVENTS
+    // =========================================================================
+
+    function isClanMember(clanData) {
+      return isSignedIn() &&
+        ('members' in clanData) &&
+        clanData.members is list &&
+        request.auth.uid in clanData.members;
+    }
+
+    function isClanAdmin(clanData) {
+      return isSignedIn() && (
+        (('admins' in clanData) && clanData.admins is list && request.auth.uid in clanData.admins) ||
+        clanData.get('founderId', '') == request.auth.uid ||
+        clanData.get('founder_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Clans Directory (/clans/{clanId})
+    match /clans/{clanId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('founderId', '') == request.auth.uid ||
+        request.resource.data.get('founder_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow update: if isSignedIn() && (
+        resource == null ||
+        isClanAdmin(resource.data) ||
+        isClanMember(resource.data) ||
+        (
+          'members' in request.resource.data &&
+          request.resource.data.members is list &&
+          request.auth.uid in request.resource.data.members
+        ) ||
+        isAdmin()
+      );
+      allow delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('founderId', '') == request.auth.uid ||
+        resource.data.get('founder_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+
+      // Subcollection Clan Members
+      match /members/{memberId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+
+      // Subcollection Clan Messages
+      match /messages/{messageId} {
+        allow get, list: if isSignedIn();
+        allow create: if isSignedIn() && (
+          request.resource.data.get('senderId', '') == request.auth.uid ||
+          isAdmin()
+        );
+        allow update, delete: if isSignedIn() && (
+          resource == null ||
+          resource.data.get('senderId', '') == request.auth.uid ||
+          isAdmin()
+        );
+      }
+
+      // Subcollection Clan Events
+      match /events/{eventId} {
+        allow get, list: if isSignedIn();
+        allow create: if isSignedIn() && (
+          request.resource.data.get('createdBy', '') == request.auth.uid ||
+          isAdmin()
+        );
+        allow update, delete: if isSignedIn();
+      }
+
+      // Subcollection Clan Vault & Upgrades
+      match /vault/{vaultId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+    }
+
+    // Flat Clan Messages Collection (/clanMessages/{messageId})
+    match /clanMessages/{messageId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('senderId', '') == request.auth.uid ||
+        request.resource.data.get('sender_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow update, delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('senderId', '') == request.auth.uid ||
+        resource.data.get('sender_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Clan Join Requests (/clanJoinRequests/{requestId})
+    match /clanJoinRequests/{requestId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        request.resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow update, delete: if isSignedIn();
+    }
+
+    // Flat Clan Events Collection (/clanEvents/{eventId})
+    match /clanEvents/{eventId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('createdBy', '') == request.auth.uid ||
+        request.resource.data.get('created_by', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow update, delete: if isSignedIn();
+    }
+
+    // Clan Wars (/clan_wars/{warId})
+    match /clan_wars/{warId} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+
+      match /matches/{matchId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+
+      match /brackets/{bracketId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+    }
+
+    // Clan Leaderboard Rankings (/clanLeaderboards/{leaderboardId})
+    match /clanLeaderboards/{leaderboardId} {
+      allow get, list: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+
+    // =========================================================================
+    // SECTION 10: GAMING HUB, MATCHMAKING, SESSIONS & LEADERBOARDS
+    // =========================================================================
+
+    // Gaming Hub Presence (/gaming_presence/{uid})
+    match /gaming_presence/{uid} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isOwner(uid) || isAdmin();
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+
+    // Real-Time Matchmaking Lobbies (/gaming_lobbies/{lobbyId})
+    match /gaming_lobbies/{lobbyId} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isSignedIn();
+
+      match /players/{userId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isOwner(userId) || isSignedIn();
+      }
+
+      match /chat/{chatId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+    }
+
+    // Gaming Profiles (/gaming_profiles/{userId})
+    match /gaming_profiles/{userId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && (isOwner(userId) || isAdmin());
+      allow update: if isSignedIn();
+      allow delete: if isOwnerOrAdmin(userId);
+
+      match /badges/{badgeId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+
+      match /seasonStats/{seasonId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+    }
+
+    // Multiplayer Game Sessions (/sessions/{sessionId})
+    match /sessions/{sessionId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('creatorId', '') == request.auth.uid ||
+        request.resource.data.get('creator_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('isPublic', true) == true ||
+        (
+          'participants' in resource.data &&
+          resource.data.participants is list &&
+          request.auth.uid in resource.data.participants
+        ) ||
+        resource.data.get('creatorId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow update: if isSignedIn() && (
+        resource == null ||
+        (
+          'participants' in resource.data &&
+          resource.data.participants is list &&
+          request.auth.uid in resource.data.participants
+        ) ||
+        resource.data.get('creatorId', '') == request.auth.uid ||
+        (
+          'participants' in request.resource.data &&
+          request.resource.data.participants is list &&
+          request.auth.uid in request.resource.data.participants
+        ) ||
+        isAdmin()
+      );
+      allow delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('creatorId', '') == request.auth.uid ||
+        resource.data.get('creator_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+
+      // Subcollection Session Messages
+      match /messages/{messageId} {
+        allow get, list: if isSignedIn();
+        allow create: if isSignedIn() && (
+          request.resource.data.get('senderId', '') == request.auth.uid ||
+          isAdmin()
+        );
+        allow update, delete: if isSignedIn() && (
+          resource == null ||
+          resource.data.get('senderId', '') == request.auth.uid ||
+          isAdmin()
+        );
+      }
+
+      // Subcollection Session Scores
+      match /scores/{scoreId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+    }
+
+    // Flat Session Messages Collection (/sessionMessages/{messageId})
+    match /sessionMessages/{messageId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('senderId', '') == request.auth.uid ||
+        request.resource.data.get('sender_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow update, delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('senderId', '') == request.auth.uid ||
+        resource.data.get('sender_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Active Game Instances (/game_sessions/{sessionId})
+    match /game_sessions/{sessionId} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isSignedIn();
+
+      match /messages/{messageId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+
+      match /scores/{scoreId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+
+      match /gameState/{stateId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+    }
+
+    // Direct 1v1 Game Challenges (/game_challenges/{challengeId})
+    match /game_challenges/{challengeId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && (
+        request.resource.data.get('fromUserId', '') == request.auth.uid ||
+        request.resource.data.get('from_user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow update, delete: if isSignedIn();
+    }
+
+    // Game Leaderboard Containers (/game_leaderboards/{gameName})
+    match /game_leaderboards/{gameName} {
+      allow get, list: if isSignedIn();
+      allow write: if isSignedIn();
+
+      match /scores/{scoreId} {
+        allow get, list: if isSignedIn();
+        allow create, update: if isSignedIn();
+        allow delete: if isAdmin();
+      }
+
+      match /seasons/{seasonId} {
+        allow get, list: if isSignedIn();
+        allow write: if isAdmin();
+      }
+    }
+
+    // Per-User Game Statistics & Match History (/game_stats/{uid})
+    match /game_stats/{uid} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isOwnerOrAdmin(uid);
+
+      match /history/{gameId} {
+        allow get, list: if isSignedIn();
+        allow create, update: if isSignedIn();
+        allow delete: if isOwnerOrAdmin(uid);
+      }
+
+      match /records/{recordId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+    }
+
+    // Game Tournaments (/game_tournaments/{tournamentId})
+    match /game_tournaments/{tournamentId} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+
+      match /participants/{participantId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+
+      match /matches/{matchId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+
+      match /rounds/{roundId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+    }
+
+
+    // =========================================================================
+    // SECTION 11: BATTLE ROYALE GAME ENGINE
+    // =========================================================================
+
+    // Battle Royale Matches (/battle_royale_matches/{matchId})
+    match /battle_royale_matches/{matchId} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+
+      match /players/{playerId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+
+      match /events/{eventId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+
+      match /zones/{zoneId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+
+      match /drops/{dropId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+    }
+
+    // Battle Royale Inventory & Loadout (/battle_royale_inventories/{userId})
+    match /battle_royale_inventories/{userId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isOwnerOrAdmin(userId);
+
+      match /loadouts/{loadoutId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isOwnerOrAdmin(userId);
+      }
+
+      match /skins/{skinId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isOwnerOrAdmin(userId);
+      }
+    }
+
+    // Battle Royale Global Leaderboard (/battle_royale_leaderboards/{scoreId})
+    match /battle_royale_leaderboards/{scoreId} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+
+    // =========================================================================
+    // SECTION 12: SHORTS, REELS & VIDEO CONTENT
+    // =========================================================================
+
+    function isValidReelOwner() {
+      return isSignedIn() && (
+        resource == null ||
+        resource.data.get('user_id', '') == request.auth.uid ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Short-Form Reels (/reels/{reelId})
+    match /reels/{reelId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('user_id', '') == request.auth.uid ||
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('is_public', true) == true ||
+        resource.data.get('isPublic', true) == true ||
+        isValidReelOwner()
+      );
+      allow update: if isSignedIn() && (
+        isValidReelOwner() ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'likes', 'commentsCount', 'shares', 'updatedAt'])
+      );
+      allow delete: if isValidReelOwner();
+
+      match /comments/{commentId} {
+        allow get, list: if isSignedIn();
+        allow create: if isSignedIn() && (
+          request.resource.data.get('userId', '') == request.auth.uid ||
+          request.resource.data.get('user_id', '') == request.auth.uid ||
+          isAdmin()
+        );
+        allow update, delete: if isSignedIn() && (
+          resource == null ||
+          resource.data.get('userId', '') == request.auth.uid ||
+          resource.data.get('user_id', '') == request.auth.uid ||
+          isAdmin()
+        );
+      }
+
+      match /likes/{userId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isOwner(userId) || isAdmin();
+      }
+
+      match /shares/{shareId} {
+        allow get, list: if isSignedIn();
+        allow create: if isSignedIn();
+        allow update, delete: if isSignedIn();
+      }
+    }
+
+    // Long-Form Videos (/videos/{videoId})
+    match /videos/{videoId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('uploaderId', '') == request.auth.uid ||
+        request.resource.data.get('uploader_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow update: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('uploaderId', '') == request.auth.uid ||
+        resource.data.get('uploader_id', '') == request.auth.uid ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'likes', 'comments', 'shares', 'updatedAt']) ||
+        isAdmin()
+      );
+      allow delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('uploaderId', '') == request.auth.uid ||
+        resource.data.get('uploader_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+
+      match /chapters/{chapterId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+    }
+
+    // Video Comments (/videoComments/{commentId})
+    match /videoComments/{commentId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('authorId', '') == request.auth.uid ||
+        request.resource.data.get('author_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow update, delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('authorId', '') == request.auth.uid ||
+        resource.data.get('author_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Video Likes (/videoLikes/{likeId})
+    match /videoLikes/{likeId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        request.resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Video Playlists (/playlists/{playlistId})
+    match /playlists/{playlistId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('creatorId', '') == request.auth.uid ||
+        request.resource.data.get('creator_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow update, delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('creatorId', '') == request.auth.uid ||
+        resource.data.get('creator_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Playlist Video References (/playlistVideos/{videoId})
+    match /playlistVideos/{videoId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('addedBy', '') == request.auth.uid ||
+        request.resource.data.get('added_by', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('addedBy', '') == request.auth.uid ||
+        resource.data.get('added_by', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Social Timeline Posts (/socialPosts/{postId})
+    match /socialPosts/{postId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('authorId', '') == request.auth.uid ||
+        request.resource.data.get('author_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow update: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('authorId', '') == request.auth.uid ||
+        resource.data.get('author_id', '') == request.auth.uid ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'comments', 'shares', 'updatedAt']) ||
+        isAdmin()
+      );
+      allow delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('authorId', '') == request.auth.uid ||
+        resource.data.get('author_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Social Post Likes (/postLikes/{likeId})
+    match /postLikes/{likeId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        request.resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Social Post Comments (/postComments/{commentId})
+    match /postComments/{commentId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('authorId', '') == request.auth.uid ||
+        request.resource.data.get('author_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow update, delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('authorId', '') == request.auth.uid ||
+        resource.data.get('author_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+
+    // =========================================================================
+    // SECTION 13: MARKETPLACE & IN-APP TRADING
+    // =========================================================================
+
+    function isListingSeller(listingData) {
+      return isSignedIn() && (
+        listingData.get('sellerId', '') == request.auth.uid ||
+        listingData.get('seller_id', '') == request.auth.uid ||
+        listingData.get('sellerUID', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Marketplace Listings (/marketplace/{listingId})
+    match /marketplace/{listingId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('sellerId', '') == request.auth.uid ||
+        request.resource.data.get('seller_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow update: if isSignedIn() && (
+        resource == null ||
+        isListingSeller(resource.data) ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'inquiries', 'offersCount', 'updatedAt']) ||
+        isAdmin()
+      );
+      allow delete: if isSignedIn() && (
+        resource == null ||
+        isListingSeller(resource.data) ||
+        isAdmin()
+      );
+
+      // Subcollection Offers
+      match /offers/{offerId} {
+        allow get, list: if isSignedIn();
+        allow create: if isSignedIn();
+        allow update, delete: if isSignedIn();
+      }
+
+      // Subcollection Reviews & Ratings
+      match /reviews/{reviewId} {
+        allow get, list: if isSignedIn();
+        allow create: if isSignedIn();
+        allow update, delete: if isSignedIn();
+      }
+    }
+
+    // Flat Marketplace Offers (/marketplaceOffers/{offerId})
+    match /marketplaceOffers/{offerId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('buyerId', '') == request.auth.uid ||
+        request.resource.data.get('buyer_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('buyerId', '') == request.auth.uid ||
+        resource.data.get('sellerId', '') == request.auth.uid ||
+        resource.data.get('buyer_id', '') == request.auth.uid ||
+        resource.data.get('seller_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow update, delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('buyerId', '') == request.auth.uid ||
+        resource.data.get('sellerId', '') == request.auth.uid ||
+        resource.data.get('buyer_id', '') == request.auth.uid ||
+        resource.data.get('seller_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // In-App Advertisements (/advertisements/{adId})
+    match /advertisements/{adId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('sellerUID', '') == request.auth.uid ||
+        request.resource.data.get('sellerId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow update, delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('sellerUID', '') == request.auth.uid ||
+        resource.data.get('sellerId', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Marketplace Transactions (/transactions/{txId})
+    match /transactions/{txId} {
+      allow get, list: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('buyerId', '') == request.auth.uid ||
+        resource.data.get('sellerId', '') == request.auth.uid ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    // Marketplace Order Records (/orders/{orderId})
+    match /orders/{orderId} {
+      allow get, list: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('buyerId', '') == request.auth.uid ||
+        resource.data.get('sellerId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn();
+
+      match /items/{itemId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+    }
+
+
+    // =========================================================================
+    // SECTION 14: BETTING HUB & PREDICTIONS
+    // =========================================================================
+
+    // Betting Matches / Odds (/bets/{betId})
+    match /bets/{betId} {
+      allow create: if isSignedIn();
+      allow get, list: if isSignedIn();
+      allow update, delete: if isSignedIn();
+
+      match /slips/{slipId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+
+      match /outcomes/{outcomeId} {
+        allow get, list: if isSignedIn();
+        allow write: if isAdmin();
+      }
+    }
+
+    // Placed Bet Slips (/betSlips/{slipId})
+    match /betSlips/{slipId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        request.resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow update, delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // User Active Bets (/user_bets/{betId})
+    match /user_bets/{betId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // Prediction Polls (/predictionPolls/{pollId})
+    match /predictionPolls/{pollId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+
+      match /options/{optionId} {
+        allow get, list: if isSignedIn();
+        allow write: if isSignedIn();
+      }
+    }
+
+
+    // =========================================================================
+    // SECTION 15: ECONOMY, TOKEN LEDGER, WALLETS & STREAKS
+    // =========================================================================
+
+    // Daily Check-In Streaks (/streaks/{uid})
+    match /streaks/{uid} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isOwnerOrAdmin(uid);
+      allow delete: if isOwnerOrAdmin(uid);
+    }
+
+    // Daily Check-In History (/tokenCheckIns/{checkInId})
+    match /tokenCheckIns/{checkInId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        request.resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow update, delete: if isAdmin();
+    }
+
+    // Token Gifts (/tokenGifts/{giftId})
+    match /tokenGifts/{giftId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('senderId', '') == request.auth.uid ||
+        request.resource.data.get('sender_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('senderId', '') == request.auth.uid ||
+        resource.data.get('recipientId', '') == request.auth.uid ||
+        resource.data.get('sender_id', '') == request.auth.uid ||
+        resource.data.get('recipient_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow update, delete: if isAdmin();
+    }
+
+    // Token Transaction Ledger (/tokenTransactions/{transactionId})
+    match /tokenTransactions/{transactionId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        request.resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow update, delete: if isAdmin();
+    }
+
+    // Legacy Token Transactions (/token_transactions/{transactionId})
+    match /token_transactions/{transactionId} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // User Wallets (/user_wallets/{userId})
+    match /user_wallets/{userId} {
+      allow get, list: if isOwnerOrAdmin(userId);
+      allow create, update, delete: if isOwnerOrAdmin(userId);
+
+      match /transactions/{txId} {
+        allow get, list: if isOwnerOrAdmin(userId);
+        allow create, update, delete: if isOwnerOrAdmin(userId);
+      }
+
+      match /cards/{cardId} {
+        allow get, list: if isOwnerOrAdmin(userId);
+        allow create, update, delete: if isOwnerOrAdmin(userId);
+      }
+    }
+
+    // Crypto Payments & Blockchain Ledger (/crypto_transactions/{txId})
+    match /crypto_transactions/{txId} {
+      allow create: if isSignedIn();
+      allow get, list: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow update, delete: if isAdmin();
+    }
+
+    // Milestone Rewards & Quest Claims (/rewards/{rewardId})
+    match /rewards/{rewardId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        request.resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow update, delete: if isAdmin();
+    }
+
+    // User Achievements (/userAchievements/{achievementId})
+    match /userAchievements/{achievementId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        request.resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow update, delete: if isAdmin();
+    }
+
+    // User Leveling Progression (/userLevels/{uid})
+    match /userLevels/{uid} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isOwnerOrAdmin(uid);
+    }
+
+    // User Stats Counter (/userStats/{uid})
+    match /userStats/{uid} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isOwnerOrAdmin(uid);
+    }
+
+
+    // =========================================================================
+    // SECTION 16: SOCIAL GRAPH & NETWORKING
+    // =========================================================================
+
+    // Friends Directory (/friends/{friendId})
+    match /friends/{friendId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        request.resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow update, delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Friend Requests (/friendRequests/{requestId})
+    match /friendRequests/{requestId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('from', '') == request.auth.uid ||
+        request.resource.data.get('fromId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('from', '') == request.auth.uid ||
+        resource.data.get('to', '') == request.auth.uid ||
+        resource.data.get('fromId', '') == request.auth.uid ||
+        resource.data.get('toId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow update: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('to', '') == request.auth.uid ||
+        resource.data.get('toId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('from', '') == request.auth.uid ||
+        resource.data.get('to', '') == request.auth.uid ||
+        resource.data.get('fromId', '') == request.auth.uid ||
+        resource.data.get('toId', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Followers Registry (/followers/{followId})
+    match /followers/{followId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('followerId', '') == request.auth.uid ||
+        request.resource.data.get('follower_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('followerId', '') == request.auth.uid ||
+        resource.data.get('follower_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Following Registry (/following/{followId})
+    match /following/{followId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        request.resource.data.get('followerId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    // Synced Phone & Email Contacts (/contacts/{contactId})
+    match /contacts/{contactId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+
+    // =========================================================================
+    // SECTION 17: ACTIVITY FEEDS & NOTIFICATIONS
+    // =========================================================================
+
+    // In-App & Push Notifications (/notifications/{notificationId})
+    match /notifications/{notificationId} {
+      allow create: if isSignedIn();
+      allow get, list: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow update: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // User Activity Timeline (/activityFeed/{uid})
+    match /activityFeed/{uid} {
+      allow get, list: if isOwnerOrAdmin(uid);
+      allow create, update, delete: if isOwnerOrAdmin(uid);
+
+      match /events/{eventId} {
+        allow create: if isSignedIn();
+        allow get, list: if isOwnerOrAdmin(uid);
+        allow update, delete: if isOwnerOrAdmin(uid);
+      }
+    }
+
+    // Broadcast Global Events (/events/{eventId})
+    match /events/{eventId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+
+    // =========================================================================
+    // SECTION 18: MODERATION, REPORTS, SUPPORT & SECURITY HUB
+    // =========================================================================
+
+    // User Moderation Reports (/reports/{reportId})
+    match /reports/{reportId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('reportedBy', '') == request.auth.uid ||
+        request.resource.data.get('reporterId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isModerator();
+      allow update, delete: if isModerator();
+    }
+
+    // Group Chat Violation Reports (/groupReports/{reportId})
+    match /groupReports/{reportId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('reportedBy', '') == request.auth.uid ||
+        request.resource.data.get('reporterId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isModerator();
+      allow update, delete: if isModerator();
+    }
+
+    // Spam Reports (/spamReports/{reportId})
+    match /spamReports/{reportId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('reporterId', '') == request.auth.uid ||
+        request.resource.data.get('reportedBy', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isModerator();
+      allow update, delete: if isModerator();
+    }
+
+    // Rust Security Hub Scans (/security_scans/{scanId})
+    match /security_scans/{scanId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow update, delete: if isAdmin();
+    }
+
+    // Security Audit Logs (/securityAuditLogs/{auditId})
+    match /securityAuditLogs/{auditId} {
+      allow create: if isSignedIn();
+      allow get, list: if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    // Audit Events Log (/audit_events/{eventId})
+    match /audit_events/{eventId} {
+      allow create: if isSignedIn();
+      allow get, list: if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    // Cloned Apps Multi-Account Sandboxes (/cloned_apps/{appId})
+    match /cloned_apps/{appId} {
+      allow get, list: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow create, update, delete: if isSignedIn() && (
+        resource == null ||
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Vault Files Metadata (/vault_files/{fileId})
+    match /vault_files/{fileId} {
+      allow get, list: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow create, update, delete: if isSignedIn() && (
+        resource == null ||
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Helpdesk Support Tickets (/supportTickets/{ticketId})
+    match /supportTickets/{ticketId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        request.resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        resource.data.get('user_id', '') == request.auth.uid ||
+        isSupportAgent()
+      );
+      allow update: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        resource.data.get('user_id', '') == request.auth.uid ||
+        isSupportAgent()
+      );
+      allow delete: if isAdmin();
+
+      match /messages/{messageId} {
+        allow get, list: if isSignedIn();
+        allow create: if isSignedIn();
+        allow update, delete: if isSupportAgent();
+      }
+    }
+
+    // Flat Support Messages (/supportMessages/{messageId})
+    match /supportMessages/{messageId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('senderId', '') == request.auth.uid ||
+        isSupportAgent()
+      );
+      allow get, list: if isSignedIn();
+      allow update, delete: if isSupportAgent();
+    }
+
+
+    // =========================================================================
+    // SECTION 19: LIVE STREAMING, AUDIO ROOMS & VOICE NOTES
+    // =========================================================================
+
+    // Live Video Streams (/live_streams/{streamId})
+    match /live_streams/{streamId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('streamerId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow update: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('streamerId', '') == request.auth.uid ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewers', 'likes', 'status', 'endedAt', 'updatedAt']) ||
+        isAdmin()
+      );
+      allow delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('streamerId', '') == request.auth.uid ||
+        isAdmin()
+      );
+
+      match /comments/{commentId} {
+        allow get, list: if isSignedIn();
+        allow create: if isSignedIn();
+        allow update, delete: if isSignedIn();
+      }
+
+      match /viewers/{viewerId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+
+      match /tips/{tipId} {
+        allow get, list: if isSignedIn();
+        allow create: if isSignedIn();
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    // Live Audio Drop-In Rooms (/audio_rooms/{roomId})
+    match /audio_rooms/{roomId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('hostId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('hostId', '') == request.auth.uid ||
+        isAdmin()
+      );
+
+      match /participants/{participantId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+
+      match /messages/{messageId} {
+        allow get, list: if isSignedIn();
+        allow create: if isSignedIn();
+        allow delete: if isSignedIn();
+      }
+
+      match /speakers/{speakerId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isSignedIn();
+      }
+    }
+
+    // Voice Notes & Audio Memos (/voice_notes/{noteId})
+    match /voice_notes/{noteId} {
+      allow create: if isSignedIn() && (
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        request.resource.data.get('senderId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow get, list: if isSignedIn();
+      allow update, delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        resource.data.get('senderId', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+
+    // =========================================================================
+    // SECTION 20: SYSTEM CONFIG, TELEMETRY, FEATURE FLAGS & LOGS (ADMIN SECURED)
+    // =========================================================================
+
+    // Global Broadcast Announcements (/announcements/{announcementId})
+    match /announcements/{announcementId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Dynamic Remote Application Config (/appConfig/{configId})
+    match /appConfig/{configId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Dynamic Feature Flags (/featureFlags/{flagId})
+    match /featureFlags/{flagId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // System Maintenance State (/maintenance/{maintenanceId})
+    match /maintenance/{maintenanceId} {
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Beta Features Access Control (/betaFeatures/{featureId})
+    match /betaFeatures/{featureId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Experimental Alpha Flags (/experimentalFeatures/{featureId})
+    match /experimentalFeatures/{featureId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // A/B Testing Experiments (/abTesting/{testId})
+    match /abTesting/{testId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Client Error Crash Reports (/errorLogs/{logId})
+    match /errorLogs/{logId} {
+      allow create: if isSignedIn();
+      allow get, list: if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    // Client Diagnostic Debug Logs (/debugLogs/{logId})
+    match /debugLogs/{logId} {
+      allow create: if isSignedIn();
+      allow get, list: if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    // Performance Metrics & Profiling (/performanceMetrics/{metricId})
+    match /performanceMetrics/{metricId} {
+      allow create: if isSignedIn();
+      allow get, list: if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    // API Rate & Quota Logs (/apiUsageLogs/{logId})
+    match /apiUsageLogs/{logId} {
+      allow create: if isSignedIn();
+      allow get, list: if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    // System Stats & Aggregate Counters (/systemStats/{statId})
+    match /systemStats/{statId} {
+      allow get, list: if isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Feature Engagement Statistics (/featureUsageStats/{statId})
+    match /featureUsageStats/{statId} {
+      allow create, update: if isSignedIn();
+      allow get, list: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Database Migration Logs (/migrationLogs/{migrationId})
+    match /migrationLogs/{migrationId} {
+      allow get, list: if isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Backup & Snapshot Metadata (/backupMetadata/{backupId})
+    match /backupMetadata/{backupId} {
+      allow get, list: if isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Unified System Log Repository (/systemLogs/{logId})
+    match /systemLogs/{logId} {
+      allow get, list: if isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Global Leaderboard Registry (/leaderboards/{leaderboardId})
+    match /leaderboards/{leaderboardId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+
+    // =========================================================================
+    // SECTION 20B: ADMIN DASHBOARD, DEFENDER, FIREWALL & SYSTEM REMOTE CONFIG
+    // =========================================================================
+
+    // Master System Remote Feature Flags & Maintenance Mode (/system_config/{configId})
+    match /system_config/{configId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Admin Dashboard Aggregates & Console Data (/admin_dashboard/{docId})
+    match /admin_dashboard/{docId} {
+      allow get, list: if isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Network Firewall Rules & Access Control Lists (/firewall_rules/{ruleId})
+    match /firewall_rules/{ruleId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Network Blocked IP Addresses (/blocked_ips/{ipId})
+    match /blocked_ips/{ipId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Defender Security Scans & Threat Analysis (/defender_scans/{scanId})
+    match /defender_scans/{scanId} {
+      allow get, list: if isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Defender Threat Definition Updates (/defender_definitions/{defId})
+    match /defender_definitions/{defId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Platform Security & Administrative Audit Logs (/admin_audit_logs/{logId})
+    match /admin_audit_logs/{logId} {
+      allow get, list: if isAdmin();
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    // Administrative Actions & Remote Command Queue (/admin_actions/{actionId})
+    match /admin_actions/{actionId} {
+      allow get, list: if isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // System-Wide Emergency Announcements & Alerts (/system_alerts/{alertId})
+    match /system_alerts/{alertId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Role-Based Access Control Registry (/user_roles/{uid})
+    match /user_roles/{uid} {
+      allow get: if isOwnerOrAdmin(uid);
+      allow list: if isAdmin();
+      allow create, update, delete: if isSuperAdmin() || isAdmin();
+    }
+
+
+    // =========================================================================
+    // SECTION 20C: MAD LIMITLESS LEVELING, MISSIONS, SCI-FI & TOKEN CASHOUTS
+    // =========================================================================
+
+    // Limitless Leveling & XP Telemetry (/user_leveling/{uid})
+    match /user_leveling/{uid} {
+      allow get, list: if isSignedIn();
+      allow create: if isOwnerOrAdmin(uid);
+      allow update: if isOwnerOrAdmin(uid);
+      allow delete: if isAdmin();
+    }
+
+    // Operative Daily Quests & Mission Progression (/user_quests/{uid})
+    match /user_quests/{uid} {
+      allow get, list: if isOwnerOrAdmin(uid);
+      allow create, update: if isOwnerOrAdmin(uid);
+      allow delete: if isAdmin();
+    }
+
+    // Global Operative Quest Catalog (/operative_quests/{questId})
+    match /operative_quests/{questId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Token Cashout & Selling Transactions (/token_cashouts/{cashoutId})
+    match /token_cashouts/{cashoutId} {
+      allow get, list: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isSignedIn() && (
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        request.resource.data.get('user_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow update: if isAdmin() || (
+        isSignedIn() &&
+        resource != null &&
+        resource.data.get('userId', '') == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['notes', 'cancelledAt', 'status'])
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Sci-Fi Animations Multi-Screen Equipped Map (/scifi_equipped/{uid})
+    match /scifi_equipped/{uid} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isOwnerOrAdmin(uid);
+      allow delete: if isAdmin();
+    }
+
+    // Sci-Fi Animation Purchases Registry (/scifi_purchases/{purchaseId})
+    match /scifi_purchases/{purchaseId} {
+      allow get, list: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isSignedIn() && (
+        request.resource.data.get('userId', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow update, delete: if isAdmin();
+    }
+
+    // Gaming Arena & Clan Battles (/clan_battles/{battleId})
+    match /clan_battles/{battleId} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+
+    // =========================================================================
+    // SECTION 21: RECURSIVE COLLECTION GROUP RULES (collectionGroup queries)
+    // =========================================================================
+
+    // Messages collection group
+    match /{path=**}/messages/{messageId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && (
+        request.resource.data.get('senderId', '') == request.auth.uid ||
+        request.resource.data.get('sender_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow update: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('senderId', '') == request.auth.uid ||
+        resource.data.get('sender_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+      allow delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('senderId', '') == request.auth.uid ||
+        resource.data.get('sender_id', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Events collection group
+    match /{path=**}/events/{eventId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // Participants collection group
+    match /{path=**}/participants/{participantId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // Tokens collection group
+    match /{path=**}/tokens/{tokenId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // Scores collection group
+    match /{path=**}/scores/{scoreId} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // Comments collection group
+    match /{path=**}/comments/{commentId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && (
+        resource == null ||
+        resource.data.get('userId', '') == request.auth.uid ||
+        resource.data.get('authorId', '') == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Likes collection group
+    match /{path=**}/likes/{likeId} {
+      allow get, list: if isSignedIn();
+      allow create, delete: if isSignedIn();
+    }
+
+    // Offers collection group
+    match /{path=**}/offers/{offerId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // Career History collection group
+    match /{path=**}/history/{historyId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+
+    // =========================================================================
+    // SECTION 22: SECURITY FALLBACK (DEFAULT DENY UNLISTED PATHS)
+    // =========================================================================
+
+    // Explicitly deny read and write access to all undefined or unspecified paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+  }
+}

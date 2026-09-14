@@ -1,0 +1,76 @@
+name: nex_app
+description: NEXDROID social platform.
+version: 1.0.0+1
+publish_to: 'none'
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.5
+  provider: ^6.0.8
+  permission_handler: ^11.3.0
+  shared_preferences: ^2.4.26
+  google_sign_in: ^6.1.5
+  nearby_connections: ^4.3.0
+  file_picker: ^12.0.0-beta.7
+  camera: ^0.11.3+4
+  google_mlkit_object_detection: ^0.16.0
+  flutter_compass: ^0.8.0
+  just_audio: ^0.10.0
+  battery_plus: ^4.0.0
+  local_auth: ^2.1.4
+  flutter_secure_storage: ^11.0.0
+  path_provider: ^2.0.17
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  uuid: ^4.0.0
+  path: ^1.8.3
+  connectivity_plus: ^6.1.0
+  workmanager: ^0.9.0+3
+  flutter_webrtc: ^1.5.0
+  flutter_sound: ^9.30.0
+  on_audio_query: ^2.9.0
+  firebase_core: ^3.1.0
+  firebase_auth: ^5.2.0
+  cloud_firestore: ^5.0.0
+  firebase_storage: ^12.0.0
+  firebase_database: ^11.0.0
+  firebase_messaging: ^15.2.10
+  video_player: ^2.6.0
+  http: ^1.6.0
+  dio: ^5.0.0
+  flutter_local_notifications: ^18.0.0
+  mobile_scanner: ^6.0.0
+  qr_flutter: ^4.0.0
+  url_launcher: ^6.1.10
+  geolocator: ^14.0.3
+  sensors_plus: ^7.1.0
+  intl: 0.20.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/app_icon.png"
+  adaptive_icon_background: "#22223A"
+  adaptive_icon_foreground: "assets/icon/app_icon.png"
+  web:
+    generate: true
+    image_path: "assets/icon/app_icon.png"
+    background_color: "#22223A"
+    theme_color: "#22223A"
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icon/
