@@ -215,9 +215,9 @@ class _ChatInputBarState extends State<ChatInputBar> {
                     color: _neonCyan,
                     onTap: () async {
                       Navigator.pop(ctx);
-                      final result = await FilePicker.platform.pickFiles(type: FileType.image);
-                      if (result != null && result.files.single.path != null) {
-                        widget.onSendImage?.call(result.files.single.path!);
+                      final result = await FilePicker.pickFile(type: FileType.image);
+                      if (result != null && result.path != null) {
+                        widget.onSendImage?.call(result.path!);
                       }
                     },
                   ),
@@ -227,11 +227,11 @@ class _ChatInputBarState extends State<ChatInputBar> {
                     color: _neonPurple,
                     onTap: () async {
                       Navigator.pop(ctx);
-                      final result = await FilePicker.platform.pickFiles();
-                      if (result != null && result.files.single.path != null) {
+                      final result = await FilePicker.pickFile();
+                      if (result != null && result.path != null) {
                         widget.onSendFile?.call(
-                          result.files.single.path!,
-                          result.files.single.name,
+                          result.path!,
+                          result.name,
                         );
                       }
                     },
@@ -309,9 +309,9 @@ class _ChatInputBarState extends State<ChatInputBar> {
           if (widget.replyTo != null)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF24143D),
-                border: const Border(
+              decoration: const BoxDecoration(
+                color: Color(0xFF24143D),
+                border: Border(
                   left: BorderSide(color: _neonPurple, width: 3),
                 ),
               ),
