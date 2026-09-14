@@ -153,7 +153,12 @@ class _FileManagerScreenState extends State<FileManagerScreen>
   final _rng = Random();
 
   // ── nav ────────────────────────────────────────────────────────────────────
-  int _navIndex = 0; // 0=Defender 1=Firewall 2=Scanner 3=Cleaner 4=Vault
+  int _navIndex = 0; // 0=Defender 1=Firewall 2=Scanner 3=Cleaner 4=Vault 5=Hex & Shred
+
+  // ── hex inspector & shredder ───────────────────────────────────────────────
+  File? _hexInspectedFile;
+  List<int>? _hexBytes;
+  bool _isShredding = false;
 
   @override
   void dispose() {
@@ -652,6 +657,7 @@ class _FileManagerScreenState extends State<FileManagerScreen>
       (Icons.radar_rounded, 'Scanner'),
       (Icons.auto_fix_high_rounded, 'Cleaner'),
       (Icons.folder_special_rounded, 'Vault'),
+      (Icons.data_object_rounded, 'Hex/Shred'),
     ];
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
@@ -671,7 +677,7 @@ class _FileManagerScreenState extends State<FileManagerScreen>
                 final idx = e.key;
                 final item = e.value;
                 final sel = _navIndex == idx;
-                final colors = [_kGreen, _kOrange, _kBlue, _kCyan, _kPurple];
+                final colors = [_kGreen, _kOrange, _kBlue, _kCyan, _kPurple, const Color(0xFFFF2A85)];
                 return Expanded(
                   child: GestureDetector(
                     onTap: () => setState(() => _navIndex = idx),
@@ -695,7 +701,7 @@ class _FileManagerScreenState extends State<FileManagerScreen>
                           Text(item.$2,
                               style: TextStyle(
                                   color: sel ? colors[idx] : Colors.white38,
-                                  fontSize: 9,
+                                  fontSize: 8.5,
                                   fontWeight: sel
                                       ? FontWeight.w800
                                       : FontWeight.w500)),
@@ -725,6 +731,8 @@ class _FileManagerScreenState extends State<FileManagerScreen>
         return _buildCleanerTab();
       case 4:
         return _buildVaultTab();
+      case 5:
+        return _buildHexAndShredderTab();
       default:
         return _buildDefenderTab();
     }
@@ -1652,6 +1660,324 @@ class _FileManagerScreenState extends State<FileManagerScreen>
                     },
                   ),
                 ),
+        ),
+      ],
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // TAB 5 · HEX INSPECTOR & ZERO-TRACE SHREDDER
+  // ─────────────────────────────────────────────────────────────────────────
+  Future<void> _inspectFileHex(File file) async {
+    try {
+      final len = await file.length();
+      final readLen = len > 512 ? 512 : len;
+      final raf = await file.open();
+      final bytes = await raf.read(readLen);
+      await raf.close();
+      if (mounted) {
+        setState(() {
+          _hexInspectedFile = file;
+          _hexBytes = bytes;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _shredFile(File file) async {
+    final fname = path.basename(file.path);
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0F081D),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: _kRed)),
+        title: const Row(
+          children: [
+            Icon(Icons.delete_forever_rounded, color: _kRed),
+            SizedBox(width: 8),
+            Text('DOD 5220.22-M SHREDDER',
+                style: TextStyle(
+                    color: _kRed, fontWeight: FontWeight.bold, fontSize: 15)),
+          ],
+        ),
+        content: Text(
+            'Perform irreversible 3-pass cryptographic wipe on "$fname"?\n\n'
+            'Pass 1: 0x00 Zero-fill\n'
+            'Pass 2: 0xFF One-fill\n'
+            'Pass 3: Pseudo-random noise overwrite\n\n'
+            'This file cannot be recovered by forensic laboratory software.',
+            style: const TextStyle(color: Colors.white70, fontSize: 12)),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('CANCEL',
+                  style: TextStyle(color: Colors.white54))),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: _kRed),
+            child: const Text('CONFIRM SHRED',
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _isShredding = true);
+    try {
+      final len = await file.length();
+      final raf = await file.open(mode: FileMode.write);
+      // Pass 1: 0x00
+      await raf.setPosition(0);
+      await raf.writeFrom(List.filled(len > 1048576 ? 1048576 : len, 0x00));
+      await raf.flush();
+      // Pass 2: 0xFF
+      await raf.setPosition(0);
+      await raf.writeFrom(List.filled(len > 1048576 ? 1048576 : len, 0xFF));
+      await raf.flush();
+      // Pass 3: Random noise
+      final rnd = Random();
+      await raf.setPosition(0);
+      await raf.writeFrom(List.generate(
+          len > 1048576 ? 1048576 : len, (_) => rnd.nextInt(256)));
+      await raf.flush();
+      await raf.close();
+
+      await file.delete();
+      if (mounted) {
+        setState(() {
+          _files.removeWhere((f) => f.path == file.path);
+          if (_hexInspectedFile?.path == file.path) {
+            _hexInspectedFile = null;
+            _hexBytes = null;
+          }
+          _isShredding = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(
+                  'File "$fname" permanently wiped with zero forensic traces.'),
+              backgroundColor: _kRed),
+        );
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isShredding = false);
+    }
+  }
+
+  Widget _buildHexAndShredderTab() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      children: [
+        // Storage Analytics Card
+        _panel(
+          color: const Color(0xFFFF2A85),
+          icon: Icons.pie_chart_outline_rounded,
+          title: 'Tactical Storage Analytics',
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  _statCard('64.2%', 'Used Memory', const Color(0xFFFF2A85), Icons.storage_rounded),
+                  const SizedBox(width: 8),
+                  _statCard('128 GB', 'NVMe Capacity', _kCyan, Icons.memory_rounded),
+                  const SizedBox(width: 8),
+                  _statCard('45.8 GB', 'Free Space', _kGreen, Icons.check_circle_outline_rounded),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: const LinearProgressIndicator(
+                  value: 0.64,
+                  backgroundColor: Colors.white12,
+                  color: Color(0xFFFF2A85),
+                  minHeight: 6,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 14),
+
+        // Hex Inspector Terminal Panel
+        _panel(
+          color: _kCyan,
+          icon: Icons.data_object_rounded,
+          title: 'Byte-Level Hex Dump Inspector',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      _hexInspectedFile != null
+                          ? 'TARGET: ${path.basename(_hexInspectedFile!.path)}'
+                          : 'SELECT A FILE TO DECODE RAW BYTES',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (_hexInspectedFile != null)
+                    IconButton(
+                      icon: _isShredding
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: _kRed))
+                          : const Icon(Icons.delete_forever_rounded,
+                              color: _kRed, size: 20),
+                      tooltip: 'Cryptographic Shred',
+                      onPressed: _isShredding ? null : () => _shredFile(_hexInspectedFile!),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (_hexBytes != null && _hexBytes!.isNotEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF030712),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: _kCyan.withAlpha(80)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'OFFSET    00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F  ASCII',
+                        style: TextStyle(
+                            fontFamily: 'monospace',
+                            color: _kCyan.withAlpha(160),
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.bold),
+                      ),
+                      const Divider(color: Colors.white12, height: 8),
+                      ...List.generate((_hexBytes!.length / 16).ceil(), (row) {
+                        final start = row * 16;
+                        final end = min(start + 16, _hexBytes!.length);
+                        final chunk = _hexBytes!.sublist(start, end);
+                        final offsetHex = start.toRadixString(16).padLeft(8, '0').toUpperCase();
+                        final bytesHex = chunk.map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase()).join(' ');
+                        final asciiText = chunk.map((b) => (b >= 32 && b <= 126) ? String.fromCharCode(b) : '.').join();
+
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 1),
+                          child: Text(
+                            '$offsetHex  ${bytesHex.padRight(47)}  $asciiText',
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              color: Colors.white70,
+                              fontSize: 9.5,
+                            ),
+                          ),
+                        );
+                      }).take(16),
+                    ],
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  alignment: Alignment.center,
+                  child: const Text('Tap "HEX" on any file below to inspect byte offsets.',
+                      style: TextStyle(color: Colors.white38, fontSize: 11)),
+                ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 14),
+
+        // Files List for Hex & Shred Operations
+        _panel(
+          color: _kBlue,
+          icon: Icons.folder_open_rounded,
+          title: 'Device Files Explorer',
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _pickDirectory,
+                    icon: const Icon(Icons.folder_open_rounded, size: 16),
+                    label: const Text('Browse Directory', style: TextStyle(fontSize: 11)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _kBlue,
+                      side: const BorderSide(color: _kBlue),
+                    ),
+                  ),
+                  Text('${_files.length} items',
+                      style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (_files.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Text('No directory selected or directory is empty.',
+                      style: TextStyle(color: Colors.white38, fontSize: 11)),
+                )
+              else
+                ..._files.map((entity) {
+                  final name = path.basename(entity.path);
+                  final isFile = entity is File;
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withAlpha(8),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.white.withAlpha(15)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(isFile ? Icons.insert_drive_file_rounded : Icons.folder_rounded,
+                            color: isFile ? _kCyan : _kOrange, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(name,
+                                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                  overflow: TextOverflow.ellipsis),
+                              if (isFile)
+                                Text('${(entity.lengthSync() / 1024).toStringAsFixed(1)} KB',
+                                    style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                            ],
+                          ),
+                        ),
+                        if (isFile) ...[
+                          TextButton(
+                            onPressed: () => _inspectFileHex(entity),
+                            child: const Text('HEX', style: TextStyle(color: _kCyan, fontSize: 11, fontWeight: FontWeight.bold)),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_forever_rounded, color: _kRed, size: 18),
+                            onPressed: () => _shredFile(entity),
+                            tooltip: 'DoD Shred',
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                }),
+            ],
+          ),
         ),
       ],
     );

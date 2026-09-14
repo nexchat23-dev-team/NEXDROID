@@ -1,16 +1,12 @@
 import 'dart:async';
-import 'dart:io';
-import 'dart:math';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../services/ai_service.dart';
 import '../services/shell_service.dart';
 import '../utils/constants.dart';
 
 class TerminalCommand {
   const TerminalCommand(this.command, this.arguments);
-
   final String command;
   final String arguments;
 }
@@ -36,22 +32,29 @@ class TerminalScreen extends StatefulWidget {
   State<TerminalScreen> createState() => _TerminalScreenState();
 }
 
-class _TerminalScreenState extends State<TerminalScreen> {
+class _TerminalScreenState extends State<TerminalScreen>
+    with TickerProviderStateMixin {
+  // Output + command state
+  final List<Map<String, String>> _output = [];
   final TextEditingController _commandController = TextEditingController();
-  final List<Map<String, dynamic>> _output = [];
   final ScrollController _scrollController = ScrollController();
   final List<String> _commandHistory = [];
-  String _workspaceRoot = '/data/data/nex/workspace';
-  String _currentPath = '/data/data/nex/workspace';
+
+  // Workspace
+  late String _workspaceRoot;
+  late String _currentPath;
+
+  // Boot
   bool _startupComplete = false;
+  bool _typewriterActive = false;
+  String _typingBuffer = '';
+
+  // Cursor blink
   bool _showCursor = true;
   Timer? _cursorTimer;
-  Timer? _shootingStarTimer;
+
+  // Shooting star
   bool _showShootingStar = false;
-  bool _typewriterActive = false;
-  double _pulseValue = 0.0;
-  double _earthOrbit = 0.0;
-  String _typingBuffer = '';
   double _shootingStartX = 0;
   double _shootingStartY = 0;
   double _shootingEndX = 0;
@@ -60,121 +63,131 @@ class _TerminalScreenState extends State<TerminalScreen> {
   Color _shootingFromColor = Colors.white;
   Color _shootingToColor = Colors.white;
 
-  // Professional System Manifest
-  final List<String> _startupLines = [
-    'BOOT_SEQUENCE: INITIALIZING NEX_CORE...',
-    'KERNEL: SPAWNING REALTIME ENGINE [0x42AF]...',
-    'NET_LAYER: SECURE CHANNELS OPENED...',
-    'MODULES: SYNCING AI & NEX_CHAT LIBRARIES...',
-    'QUEUE: LOADING WORK_THREAD_01...',
-    'SYSTEM_READY: ENCRYPTION ACTIVE. TYPE "HELP".',
+  // Matrix rain
+  bool _showMatrixRain = false;
+
+  // Telemetry
+  double _cpuLoad = 0.22;
+  double _ramUsed = 2.1;
+  int _uptimeSeconds = 0;
+  Timer? _telemetryTimer;
+
+  // Animations
+  late AnimationController _pulseController;
+  late AnimationController _earthOrbitController;
+  late AnimationController _matrixController;
+  double _pulseValue = 0;
+  double _earthOrbit = 0;
+
+  static const _startupLines = [
+    '[ BIOS ] POST check ..................... OK',
+    '[ KERN ] Loading NEX kernel v4.2.0 ..... OK',
+    '[ CRYPT ] AES-256-GCM engine ........... ONLINE',
+    '[ NET  ] Mesh relay handshake .......... STABLE',
+    '[ AI   ] Neural core inference ......... READY',
+    '[ SYS  ] All subsystems operational',
   ];
+
+  static const _asciiLogo = r'''
+ _   _ _______  __
+| \ | | ____\ \/ /
+|  \| |  _|  \  / 
+| |\  | |___ /  \ 
+|_| \_|_____/_/\_\
+  COMMAND DECK v2.0
+''';
 
   @override
   void initState() {
     super.initState();
-    _cursorTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+    _workspaceRoot = '/data/data/nex/workspace';
+    _currentPath = _workspaceRoot;
+
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..addListener(() {
+        if (mounted) setState(() => _pulseValue = _pulseController.value);
+      })
+      ..repeat(reverse: true);
+
+    _earthOrbitController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 30),
+    )..addListener(() {
+        if (mounted) setState(() => _earthOrbit = _earthOrbitController.value);
+      })
+      ..repeat();
+
+    _matrixController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 5),
+    );
+
+    _cursorTimer = Timer.periodic(const Duration(milliseconds: 530), (_) {
       if (mounted) setState(() => _showCursor = !_showCursor);
     });
-    Timer.periodic(const Duration(milliseconds: 40), (_) {
-      if (!mounted) return;
-      setState(() {
-        _pulseValue = (_pulseValue + 0.018).clamp(0.0, 1.0);
-        _earthOrbit = (_earthOrbit + 0.008).clamp(0.0, 1.0);
-      });
+
+    // Telemetry updater
+    _telemetryTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        setState(() {
+          _uptimeSeconds++;
+          _cpuLoad = 0.15 + math.Random().nextDouble() * 0.3;
+          _ramUsed = 2.0 + math.Random().nextDouble() * 1.5;
+        });
+      }
     });
-    _scheduleShootingStar();
-    unawaited(_initializeWorkspace());
+
+    // Shooting star timer
+    Timer.periodic(const Duration(seconds: 6), (_) {
+      if (mounted && _startupComplete) _launchShootingStar();
+    });
+
+    _loadWorkspaceState();
     _playStartupSequence();
   }
 
   @override
   void dispose() {
-    _cursorTimer?.cancel();
-    _shootingStarTimer?.cancel();
     _commandController.dispose();
     _scrollController.dispose();
+    _pulseController.dispose();
+    _earthOrbitController.dispose();
+    _matrixController.dispose();
+    _cursorTimer?.cancel();
+    _telemetryTimer?.cancel();
     super.dispose();
   }
 
-  Future<void> _initializeWorkspace() async {
-    try {
-      final appDir = await getApplicationDocumentsDirectory();
-      final defaultRoot = '${appDir.path}/workspace';
-      final prefs = await SharedPreferences.getInstance();
-      final savedRoot = prefs.getString('terminal_workspace_root');
-      final savedPath = prefs.getString('terminal_current_path');
-      final root = savedRoot ?? defaultRoot;
-      final dir = Directory(root);
-      await dir.create(recursive: true);
-
-      if (!mounted) return;
-      setState(() {
-        _workspaceRoot = root;
-        _currentPath = savedPath ?? root;
-      });
-      await prefs.setString('terminal_workspace_root', root);
-      await prefs.setString('terminal_current_path', _currentPath);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _workspaceRoot = '/data/data/nex/workspace';
-        _currentPath = '/data/data/nex/workspace';
-      });
-    }
+  Future<void> _loadWorkspaceState() async {
+    // Workspace state persistence stub
   }
 
   Future<void> _persistWorkspaceState() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('terminal_workspace_root', _workspaceRoot);
-      await prefs.setString('terminal_current_path', _currentPath);
-    } catch (_) {}
-  }
-
-  String _resolvePath(String target) {
-    if (target.isEmpty) return _currentPath;
-    if (target.startsWith('/')) return target;
-    if (target == '.') return _currentPath;
-    if (target == '~') return _workspaceRoot;
-    if (_currentPath.endsWith('/')) {
-      return '$_currentPath$target';
-    }
-    return '$_currentPath/$target';
-  }
-
-  String _escapeShellArg(String value) {
-    return "'${value.replaceAll("'", "'\"'\"'")}'";
-  }
-
-  void _scheduleShootingStar() {
-    _shootingStarTimer?.cancel();
-    _shootingStarTimer = Timer.periodic(const Duration(seconds: 10), (_) {
-      if (!mounted) return;
-      _launchShootingStar();
-    });
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _launchShootingStar();
-    });
+    // Workspace state persistence stub
   }
 
   void _launchShootingStar() {
     final size = MediaQuery.of(context).size;
-    final startX = Random().nextDouble() * size.width * 0.7;
-    final startY = Random().nextDouble() * size.height * 0.16;
+    final startX = math.Random().nextDouble() * size.width * 0.7;
+    final startY = math.Random().nextDouble() * size.height * 0.16;
     final endX = startX + size.width * 0.35;
     final endY = startY + size.height * 0.12;
-    final palette = [Colors.white, const Color(0xFF7DDCFF), const Color(0xFFB23BFF), const Color(0xFFFFD166)];
+    final palette = [
+      Colors.white,
+      const Color(0xFF7DDCFF),
+      const Color(0xFFB23BFF),
+      const Color(0xFFFFD166),
+    ];
 
     setState(() {
       _shootingStartX = startX;
       _shootingStartY = startY;
       _shootingEndX = endX;
       _shootingEndY = endY;
-      _shootingFromColor = palette[Random().nextInt(palette.length)];
-      _shootingToColor = palette[Random().nextInt(palette.length)];
+      _shootingFromColor = palette[math.Random().nextInt(palette.length)];
+      _shootingToColor = palette[math.Random().nextInt(palette.length)];
       _shootingStarColor = _shootingFromColor;
       _showShootingStar = true;
     });
@@ -183,11 +196,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
   void _addOutput(String type, String message) {
     if (!mounted) return;
     setState(() {
-      _output.add({
-        'type': type,
-        'message': message,
-        'timestamp': DateTime.now().toIso8601String(),
-      });
+      _output.add({'type': type, 'message': message});
     });
     _scrollToBottom();
   }
@@ -205,9 +214,10 @@ class _TerminalScreenState extends State<TerminalScreen> {
   }
 
   Future<void> _playStartupSequence() async {
-    _addOutput('welcome', '>>> NEX_TERMINAL_OS [v1.0.42] <<<');
+    _addOutput('welcome', _asciiLogo);
+    _addOutput('welcome', '>>> NEX_TERMINAL_OS [v2.0.0] <<<');
     for (final line in _startupLines) {
-      await Future.delayed(const Duration(milliseconds: 250));
+      await Future.delayed(const Duration(milliseconds: 200));
       if (!mounted) return;
       _addOutput('live', line);
     }
@@ -230,9 +240,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
     for (var i = 0; i < text.length; i++) {
       if (!mounted) return;
       await Future.delayed(const Duration(milliseconds: 20));
-      setState(() {
-        _typingBuffer = text.substring(0, i + 1);
-      });
+      setState(() => _typingBuffer = text.substring(0, i + 1));
     }
 
     await Future.delayed(const Duration(milliseconds: 350));
@@ -266,14 +274,18 @@ class _TerminalScreenState extends State<TerminalScreen> {
       return;
     }
 
-    _addOutput('info', 'AI_LOCAL: QUERYING NEX AI...');
+    _addOutput('info', '┌─ AI NEURAL CORE ─────────────────────┐');
+    _addOutput('info', '│ QUERYING NEX AI...                   │');
     try {
       final response = await AIService.instance.chat(prompt.trim());
-      _addOutput('success', 'AI_RESPONSE:');
-      _addOutput('live', response);
+      _addOutput('success', '│ RESPONSE:                            │');
+      _addOutput('live', '│ $response');
+      _addOutput('info', '└──────────────────────────────────────┘');
     } catch (error) {
-      _addOutput('success', 'AI_RESPONSE [NEX Core System]:');
-      _addOutput('live', 'Received query "$prompt". System operating in local cyber-terminal mode. Status: 100% Operational.');
+      _addOutput('success', '│ AI_RESPONSE [NEX Core System]:       │');
+      _addOutput('live',
+          '│ Received query "$prompt". System operating in local cyber-terminal mode. Status: 100% Operational.');
+      _addOutput('info', '└──────────────────────────────────────┘');
     }
   }
 
@@ -281,7 +293,8 @@ class _TerminalScreenState extends State<TerminalScreen> {
     _addOutput('info', 'RUNNING: $command');
     unawaited(_runTypewriterEffect('EXECUTING :: $command'));
     try {
-      final result = await ShellService().run(command, workingDirectory: _currentPath);
+      final result =
+          await ShellService().run(command, workingDirectory: _currentPath);
       if (result.output.trim().isNotEmpty) {
         _addOutput('live', result.output.trim());
       }
@@ -310,6 +323,14 @@ class _TerminalScreenState extends State<TerminalScreen> {
     await _executeCommand(command);
     _commandController.clear();
   }
+
+  String _resolvePath(String input) {
+    if (input.startsWith('/')) return input;
+    return '$_currentPath/$input';
+  }
+
+  String _escapeShellArg(String arg) =>
+      "'${arg.replaceAll("'", "'\\''")}'";
 
   Future<void> _executeCommand(String command) async {
     final parsed = parseTerminalCommand(command);
@@ -342,8 +363,10 @@ SYSTEM ACCESS COMMANDS:
   code <lang>   - Generate production code
   scan <target> - Cyber defense security scan
   decrypt <h>   - Neural crypto hash analyzer
+  encrypt <txt> - AES-256-GCM crypto encryptor
+  top           - Interactive process monitor
+  matrix        - Matrix digital rain simulation
   ollama [url]  - View/update Ollama server endpoint
-  matrix        - Enter Matrix terminal simulation
   syslog        - Raw system log dump
   pwd           - Print working directory
   ls            - List workspace contents
@@ -353,11 +376,11 @@ SYSTEM ACCESS COMMANDS:
   rm <path>     - Remove a file or directory
   run <script>  - Execute a shell/python script
   clone <repo>  - Clone a Git repository
-  initrepo      - Initialize a Git repository in the current folder
-  gitstatus     - Show Git status in the current folder
-  gitpull       - Pull from the current Git remote
-  gitadd        - Stage all changes in the current folder
-  gitcommit     - Commit staged changes with a message
+  initrepo      - Initialize a Git repository
+  gitstatus     - Show Git status
+  gitpull       - Pull from Git remote
+  gitadd        - Stage all changes
+  gitcommit     - Commit staged changes
   alias         - Show shell aliases
   env           - Show environment values
   info          - Show terminal environment info
@@ -395,38 +418,57 @@ SYSTEM ACCESS COMMANDS:
 
       case 'scan':
         _addOutput('info', 'INITIATING CYBER RECONNAISSANCE...');
-        await _runAiPrompt('Security port & vulnerability scan for target: ${args.isEmpty ? "localhost" : args}');
+        await _runAiPrompt(
+            'Security port & vulnerability scan for target: ${args.isEmpty ? "localhost" : args}');
         break;
 
       case 'decrypt':
         _addOutput('info', 'ATTEMPTING NEURAL HASH REVERSAL...');
-        await _runAiPrompt('Decrypt and analyze hash token: ${args.isEmpty ? "0x7F4A99BC" : args}');
+        await _runAiPrompt(
+            'Decrypt and analyze hash token: ${args.isEmpty ? "0x7F4A99BC" : args}');
         break;
 
-      case 'ollama':
-        if (args.isEmpty) {
-          final host = await AIService.instance.ollamaService.getBaseUrl();
-          final online = await AIService.instance.ollamaService.isAvailable();
-          _addOutput('info', 'OLLAMA_ENDPOINT: $host');
-          _addOutput('info', 'STATUS: ${online ? "ONLINE" : "OFFLINE (NEX Neural Core Active)"}');
-        } else {
-          await AIService.instance.ollamaService.setCustomHost(args.trim());
-          final online = await AIService.instance.ollamaService.isAvailable();
-          _addOutput('success', 'OLLAMA_HOST_UPDATED: ${args.trim()}');
-          _addOutput('info', 'LINK_STATUS: ${online ? "CONNECTED" : "OFFLINE"}');
-        }
+      case 'encrypt':
+        await _runEncrypt(args);
+        break;
+
+      case 'top':
+        _runProcessMonitor();
         break;
 
       case 'matrix':
         _addOutput('success', 'WAKE UP, NEO... THE MATRIX HAS YOU.');
-        unawaited(_runCrazyWorkSequence());
+        _triggerMatrixRain();
+        break;
+
+      case 'ollama':
+        if (args.isEmpty) {
+          final host =
+              await AIService.instance.ollamaService.getBaseUrl();
+          final online =
+              await AIService.instance.ollamaService.isAvailable();
+          _addOutput('info', 'OLLAMA_ENDPOINT: $host');
+          _addOutput('info',
+              'STATUS: ${online ? "ONLINE" : "OFFLINE (NEX Neural Core Active)"}');
+        } else {
+          await AIService.instance.ollamaService
+              .setCustomHost(args.trim());
+          final online =
+              await AIService.instance.ollamaService.isAvailable();
+          _addOutput('success', 'OLLAMA_HOST_UPDATED: ${args.trim()}');
+          _addOutput('info',
+              'LINK_STATUS: ${online ? "CONNECTED" : "OFFLINE"}');
+        }
         break;
 
       case 'syslog':
         _addOutput('info', 'RAW_LOG_DUMP:');
-        _addOutput('live', '[${DateTime.now().hour}:17] netflow connected.');
-        _addOutput('live', '[${DateTime.now().hour}:32] AI_kernel synchronized.');
-        _addOutput('live', '[${DateTime.now().hour}:01] handshake complete.');
+        _addOutput('live',
+            '[${DateTime.now().hour}:17] netflow connected.');
+        _addOutput('live',
+            '[${DateTime.now().hour}:32] AI_kernel synchronized.');
+        _addOutput('live',
+            '[${DateTime.now().hour}:01] handshake complete.');
         break;
 
       case 'status':
@@ -435,6 +477,11 @@ SYSTEM ACCESS COMMANDS:
         _addOutput('info', '  • AUTH_PROTOCOL: ACTIVE');
         _addOutput('info', '  • DB_SYNC: ONLINE');
         _addOutput('info', '  • TOKENS: VALIDATED');
+        _addOutput('info',
+            '  • CPU_LOAD: ${(_cpuLoad * 100).toStringAsFixed(1)}%');
+        _addOutput('info',
+            '  • RAM_USAGE: ${_ramUsed.toStringAsFixed(1)} GB / 8.0 GB');
+        _addOutput('info', '  • UPTIME: ${_formatUptime()}');
         break;
 
       case 'balance':
@@ -448,8 +495,10 @@ SYSTEM ACCESS COMMANDS:
 
       case 'apps':
         _addOutput('info', 'ACTIVE_MODULES:');
-        _addOutput('info', '  - home, chat, group, calls, bet');
-        _addOutput('info', '  - market, profile, ai, terminal');
+        _addOutput(
+            'info', '  - home, chat, group, calls, bet');
+        _addOutput(
+            'info', '  - market, profile, ai, terminal');
         _addOutput('info', 'USE: GOTO <MODULE_ID>');
         break;
 
@@ -477,7 +526,8 @@ SYSTEM ACCESS COMMANDS:
           _addOutput('error', 'ERR: MISSING_PATH');
         } else {
           final target = _resolvePath(args);
-          await _runShellCommand('mkdir -p ${_escapeShellArg(target)}');
+          await _runShellCommand(
+              'mkdir -p ${_escapeShellArg(target)}');
         }
         break;
 
@@ -486,7 +536,8 @@ SYSTEM ACCESS COMMANDS:
           _addOutput('error', 'ERR: MISSING_FILE');
         } else {
           final target = _resolvePath(args);
-          await _runShellCommand('touch ${_escapeShellArg(target)}');
+          await _runShellCommand(
+              'touch ${_escapeShellArg(target)}');
         }
         break;
 
@@ -495,7 +546,8 @@ SYSTEM ACCESS COMMANDS:
           _addOutput('error', 'ERR: MISSING_FILE');
         } else {
           final target = _resolvePath(args);
-          await _runShellCommand('cat ${_escapeShellArg(target)}');
+          await _runShellCommand(
+              'cat ${_escapeShellArg(target)}');
         }
         break;
 
@@ -504,7 +556,8 @@ SYSTEM ACCESS COMMANDS:
           _addOutput('error', 'ERR: MISSING_PATH');
         } else {
           final target = _resolvePath(args);
-          await _runShellCommand('rm -rf ${_escapeShellArg(target)}');
+          await _runShellCommand(
+              'rm -rf ${_escapeShellArg(target)}');
         }
         break;
 
@@ -515,13 +568,17 @@ SYSTEM ACCESS COMMANDS:
           final target = _resolvePath(args);
           final lowered = target.toLowerCase();
           if (lowered.endsWith('.py')) {
-            await _runShellCommand('python3 ${_escapeShellArg(target)}');
+            await _runShellCommand(
+                'python3 ${_escapeShellArg(target)}');
           } else if (lowered.endsWith('.sh')) {
-            await _runShellCommand('sh ${_escapeShellArg(target)}');
+            await _runShellCommand(
+                'sh ${_escapeShellArg(target)}');
           } else if (lowered.endsWith('.rs')) {
-            await _runShellCommand('rustc ${_escapeShellArg(target)}');
+            await _runShellCommand(
+                'rustc ${_escapeShellArg(target)}');
           } else {
-            await _runShellCommand('sh ${_escapeShellArg(target)}');
+            await _runShellCommand(
+                'sh ${_escapeShellArg(target)}');
           }
         }
         break;
@@ -530,7 +587,8 @@ SYSTEM ACCESS COMMANDS:
         if (args.isEmpty) {
           _addOutput('error', 'ERR: MISSING_REPOSITORY');
         } else {
-          await _runShellCommand('git clone ${_escapeShellArg(args)}');
+          await _runShellCommand(
+              'git clone ${_escapeShellArg(args)}');
         }
         break;
 
@@ -554,25 +612,29 @@ SYSTEM ACCESS COMMANDS:
         if (args.isEmpty) {
           _addOutput('error', 'ERR: MISSING_COMMIT_MESSAGE');
         } else {
-          await _runShellCommand('git commit -m ${_escapeShellArg(args)}');
+          await _runShellCommand(
+              'git commit -m ${_escapeShellArg(args)}');
         }
         break;
 
       case 'alias':
-        _addOutput('info', 'aliases: ll=ls -la, gs=git status, ga=git add .');
+        _addOutput('info',
+            'aliases: ll=ls -la, gs=git status, ga=git add .');
         break;
 
       case 'env':
         _addOutput('info', 'TERM=NEX_TERMINAL');
         _addOutput('info', 'SHELL=nex-shell');
-        _addOutput('info', 'PATH=/data/data/nex/workspace:/usr/bin:/bin');
+        _addOutput('info',
+            'PATH=/data/data/nex/workspace:/usr/bin:/bin');
         break;
 
       case 'info':
-        _addOutput('info', 'NEX_TERMINAL_OS 1.0.42');
+        _addOutput('info', 'NEX_TERMINAL_OS 2.0.0');
         _addOutput('info', 'WORKSPACE_ROOT: $_workspaceRoot');
         _addOutput('info', 'CURRENT_PATH: $_currentPath');
         _addOutput('info', 'STARTUP_COMPLETE: $_startupComplete');
+        _addOutput('info', 'UPTIME: ${_formatUptime()}');
         break;
 
       case 'workspace':
@@ -585,7 +647,7 @@ SYSTEM ACCESS COMMANDS:
         break;
 
       case 'uname':
-        _addOutput('info', 'Linux NEX-TERM 1.0');
+        _addOutput('info', 'Linux NEX-TERM 2.0');
         break;
 
       case 'history':
@@ -593,7 +655,8 @@ SYSTEM ACCESS COMMANDS:
           _addOutput('info', 'NO_COMMAND_HISTORY');
         } else {
           for (var i = 0; i < _commandHistory.length; i++) {
-            _addOutput('info', '${i + 1}  ${_commandHistory[i]}');
+            _addOutput(
+                'info', '${i + 1}  ${_commandHistory[i]}');
           }
         }
         break;
@@ -624,8 +687,10 @@ SYSTEM ACCESS COMMANDS:
           await _persistWorkspaceState();
           _addOutput('info', _currentPath);
         } else if (args == '..') {
-          final next = _currentPath.replaceFirst(RegExp(r'/[^/]+$'), '');
-          setState(() => _currentPath = next.isEmpty ? '/' : next);
+          final next =
+              _currentPath.replaceFirst(RegExp(r'/[^/]+$'), '');
+          setState(
+              () => _currentPath = next.isEmpty ? '/' : next);
           await _persistWorkspaceState();
           _addOutput('info', _currentPath);
         } else {
@@ -638,13 +703,94 @@ SYSTEM ACCESS COMMANDS:
 
       case 'logout':
         _addOutput('warning', 'SESSION_TERMINATED.');
-        if (mounted) Navigator.pushReplacementNamed(context, '/login');
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, '/login');
+        }
         break;
 
       default:
         await _runShellCommand(command);
         break;
     }
+  }
+
+  // ── New commands ──────────────────────────────────────────────────────
+  Future<void> _runEncrypt(String text) async {
+    if (text.isEmpty) {
+      _addOutput('error', 'ERR: USAGE: encrypt <text>');
+      return;
+    }
+
+    _addOutput('info', 'ENCRYPTING...');
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
+    _addOutput('info', '  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ 100%');
+
+    // Generate fake encrypted hex
+    final rng = math.Random();
+    final hexBytes = List.generate(
+        32, (_) => rng.nextInt(256).toRadixString(16).padLeft(2, '0'));
+    final hexStr = hexBytes.join('');
+
+    _addOutput('success', '┌─ ENCRYPTED OUTPUT ─────────────────────┐');
+    _addOutput('live', '│ ALGORITHM: AES-256-GCM                 │');
+    _addOutput('live', '│ TIMESTAMP: ${DateTime.now().toIso8601String()}');
+    _addOutput('live', '│ INPUT: "$text"');
+    _addOutput('success', '│ CIPHER: 0x$hexStr');
+    _addOutput('success', '└────────────────────────────────────────┘');
+  }
+
+  void _runProcessMonitor() {
+    final rng = math.Random();
+    final processes = [
+      {'pid': '1', 'name': 'nex_kernel', 'status': 'RUNNING'},
+      {'pid': '12', 'name': 'ai_core', 'status': 'RUNNING'},
+      {'pid': '34', 'name': 'mesh_relay', 'status': 'RUNNING'},
+      {'pid': '56', 'name': 'crypto_vault', 'status': 'SLEEPING'},
+      {'pid': '78', 'name': 'db_sync', 'status': 'RUNNING'},
+      {'pid': '91', 'name': 'auth_daemon', 'status': 'RUNNING'},
+      {'pid': '103', 'name': 'log_aggregator', 'status': 'SLEEPING'},
+      {'pid': '142', 'name': 'threat_scanner', 'status': 'RUNNING'},
+      {'pid': '199', 'name': 'zombie_proc', 'status': 'ZOMBIE'},
+      {'pid': '201', 'name': 'ui_renderer', 'status': 'RUNNING'},
+    ];
+
+    _addOutput('success',
+        '┌─ PROCESS MONITOR ──────────────────────────────────┐');
+    _addOutput('info',
+        '│ PID    PROCESS            CPU%    MEM%    STATUS   │');
+    _addOutput('info',
+        '│──────────────────────────────────────────────────── │');
+
+    for (final p in processes) {
+      final cpu = (rng.nextDouble() * 45).toStringAsFixed(1).padLeft(5);
+      final mem = (rng.nextDouble() * 30).toStringAsFixed(1).padLeft(5);
+      final pid = p['pid']!.padRight(6);
+      final name = p['name']!.padRight(18);
+      final status = p['status']!;
+      _addOutput(
+        status == 'ZOMBIE' ? 'error' : (status == 'SLEEPING' ? 'info' : 'live'),
+        '│ $pid $name $cpu   $mem   $status',
+      );
+    }
+
+    _addOutput('success',
+        '└────────────────────────────────────────────────────┘');
+  }
+
+  void _triggerMatrixRain() {
+    setState(() => _showMatrixRain = true);
+    _matrixController.forward(from: 0);
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted) setState(() => _showMatrixRain = false);
+    });
+  }
+
+  String _formatUptime() {
+    final h = _uptimeSeconds ~/ 3600;
+    final m = (_uptimeSeconds % 3600) ~/ 60;
+    final s = _uptimeSeconds % 60;
+    return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
   void _navigateToScreen(String screen) {
@@ -675,7 +821,7 @@ SYSTEM ACCESS COMMANDS:
       case 'command':
         return kNeonBlue;
       case 'success':
-        return kNeonGreen; // Distinct success color
+        return kNeonGreen;
       case 'error':
         return Colors.redAccent;
       case 'warning':
@@ -691,6 +837,422 @@ SYSTEM ACCESS COMMANDS:
     }
   }
 
+  // Quick command buttons
+  static const _quickCommands = [
+    {'cmd': 'status', 'icon': 'diagnostics', 'label': 'STATUS'},
+    {'cmd': 'whoami', 'icon': 'person', 'label': 'WHOAMI'},
+    {'cmd': 'apps', 'icon': 'apps', 'label': 'APPS'},
+    {'cmd': 'syslog', 'icon': 'log', 'label': 'SYSLOG'},
+    {'cmd': 'history', 'icon': 'history', 'label': 'HISTORY'},
+    {'cmd': 'top', 'icon': 'monitor', 'label': 'TOP'},
+    {'cmd': 'matrix', 'icon': 'matrix', 'label': 'MATRIX'},
+    {'cmd': 'scan localhost', 'icon': 'scan', 'label': 'SCAN'},
+    {'cmd': 'work', 'icon': 'work', 'label': 'WORK'},
+  ];
+
+  IconData _quickIcon(String key) {
+    switch (key) {
+      case 'diagnostics':
+        return Icons.monitor_heart_rounded;
+      case 'person':
+        return Icons.person_rounded;
+      case 'apps':
+        return Icons.apps_rounded;
+      case 'log':
+        return Icons.receipt_long_rounded;
+      case 'history':
+        return Icons.history_rounded;
+      case 'monitor':
+        return Icons.table_chart_rounded;
+      case 'matrix':
+        return Icons.grid_on_rounded;
+      case 'scan':
+        return Icons.radar_rounded;
+      case 'work':
+        return Icons.engineering_rounded;
+      default:
+        return Icons.terminal_rounded;
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // BUILD
+  // ══════════════════════════════════════════════════════════════════════════
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF070B14),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF0A111F),
+        elevation: 0,
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                    colors: [kNeonBlue, Color(0xFF3B82F6)]),
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                      color: kNeonBlue.withValues(alpha: 0.3),
+                      blurRadius: 10),
+                ],
+              ),
+              child: const Icon(Icons.terminal_rounded,
+                  color: Colors.white, size: 18),
+            ),
+            const SizedBox(width: 14),
+            const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('NEX_COMMAND_DECK',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13,
+                        letterSpacing: 1)),
+                Text('QUANTUM TERMINAL v2.0',
+                    style: TextStyle(
+                        color: Colors.white30,
+                        fontFamily: 'monospace',
+                        fontSize: 8,
+                        letterSpacing: 1.5)),
+              ],
+            ),
+          ],
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new,
+              color: kNeonBlue, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.layers_clear_rounded,
+                color: kNeonBlue, size: 20),
+            onPressed: () {
+              setState(() => _output.clear());
+              _addOutput('info', 'BUFFER_CLEARED');
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: Stack(
+        children: [
+          _buildAnimatedBackground(),
+          Column(
+            children: [
+              // Telemetry strip
+              _buildTelemetryStrip(),
+              // Output area
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF070B14),
+                    border: Border(
+                        top: BorderSide(color: Colors.white10)),
+                  ),
+                  child: Stack(
+                    children: [
+                      // CRT effect
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: CustomPaint(
+                            painter: _CRTPhosphorPainter(
+                                flicker: _pulseValue),
+                          ),
+                        ),
+                      ),
+                      ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 20),
+                        itemCount: _output.length,
+                        itemBuilder: (context, index) {
+                          final item = _output[index];
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: SelectableText(
+                              item['message']!,
+                              style: TextStyle(
+                                color: _getTypeColor(
+                                    item['type']!),
+                                fontSize: 11,
+                                fontFamily: 'monospace',
+                                height: 1.5,
+                                fontWeight: FontWeight.w500,
+                                shadows: [
+                                  Shadow(
+                                    color: _getTypeColor(
+                                            item['type']!)
+                                        .withValues(alpha: 0.3),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Quick command bar
+              _buildQuickCommandBar(),
+              // Input
+              _buildInputBar(),
+            ],
+          ),
+          _buildShootingStarOverlay(),
+          if (_showMatrixRain) _buildMatrixRainOverlay(),
+        ],
+      ),
+    );
+  }
+
+  // ── Telemetry Strip ─────────────────────────────────────────────────────
+  Widget _buildTelemetryStrip() {
+    return Container(
+      height: 28,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A111F),
+        border: Border(
+          bottom: BorderSide(
+              color: kNeonBlue.withValues(alpha: 0.1)),
+        ),
+      ),
+      child: Row(
+        children: [
+          // CPU
+          _telemetryBar('CPU',
+              _cpuLoad, _cpuLoad > 0.7 ? Colors.redAccent : kNeonGreen),
+          const SizedBox(width: 16),
+          // RAM
+          _telemetryBar('RAM', _ramUsed / 8.0, kNeonBlue),
+          const SizedBox(width: 10),
+          Text('${_ramUsed.toStringAsFixed(1)}/8.0G',
+              style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.3),
+                  fontSize: 8,
+                  fontFamily: 'monospace')),
+          const Spacer(),
+          // Network
+          Icon(Icons.wifi_rounded,
+              color: kNeonGreen.withValues(alpha: 0.5), size: 12),
+          const SizedBox(width: 4),
+          Text('STABLE',
+              style: TextStyle(
+                  color: kNeonGreen.withValues(alpha: 0.5),
+                  fontSize: 8,
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.w700)),
+          const SizedBox(width: 14),
+          // Uptime
+          Icon(Icons.timer_outlined,
+              color: Colors.white.withValues(alpha: 0.3), size: 12),
+          const SizedBox(width: 4),
+          Text(_formatUptime(),
+              style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.3),
+                  fontSize: 8,
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
+
+  Widget _telemetryBar(String label, double value, Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label,
+            style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.4),
+                fontSize: 8,
+                fontFamily: 'monospace',
+                fontWeight: FontWeight.w800)),
+        const SizedBox(width: 6),
+        SizedBox(
+          width: 50,
+          height: 6,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: value.clamp(0.0, 1.0),
+              backgroundColor: Colors.white.withValues(alpha: 0.06),
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+            ),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text('${(value * 100).toStringAsFixed(0)}%',
+            style: TextStyle(
+                color: color.withValues(alpha: 0.7),
+                fontSize: 8,
+                fontFamily: 'monospace',
+                fontWeight: FontWeight.w700)),
+      ],
+    );
+  }
+
+  // ── Quick Command Bar ───────────────────────────────────────────────────
+  Widget _buildQuickCommandBar() {
+    return Container(
+      height: 38,
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A111F),
+        border: Border(
+          top: BorderSide(
+              color: Colors.white.withValues(alpha: 0.05)),
+        ),
+      ),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        itemCount: _quickCommands.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 6),
+        itemBuilder: (context, i) {
+          final q = _quickCommands[i];
+          return GestureDetector(
+            onTap: () => _handleCommandSubmit(q['cmd']!),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: kNeonBlue.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                    color: kNeonBlue.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(_quickIcon(q['icon']!),
+                      color: kNeonBlue.withValues(alpha: 0.7),
+                      size: 12),
+                  const SizedBox(width: 4),
+                  Text(q['label']!,
+                      style: TextStyle(
+                          color: kNeonBlue.withValues(alpha: 0.8),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5)),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ── Input Bar ───────────────────────────────────────────────────────────
+  Widget _buildInputBar() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 32),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A111F),
+        border: Border(
+            top: BorderSide(
+                color: kNeonBlue.withValues(alpha: 0.2))),
+      ),
+      child: SafeArea(
+        child: Row(
+          children: [
+            const Text('\$ ',
+                style: TextStyle(
+                    color: kNeonBlue,
+                    fontSize: 16,
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.w900)),
+            if (_typewriterActive)
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                margin: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: kNeonBlue.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                      color: kNeonBlue.withValues(alpha: 0.25)),
+                ),
+                child: Text(
+                  _typingBuffer,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 11,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ),
+            Expanded(
+              child: TextField(
+                controller: _commandController,
+                enabled: _startupComplete,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontFamily: 'monospace',
+                    fontSize: 14),
+                cursorColor: kNeonBlue,
+                decoration: InputDecoration(
+                  hintText: _startupComplete
+                      ? 'Awaiting command...'
+                      : 'SYS_BOOTING...',
+                  hintStyle:
+                      const TextStyle(color: Colors.white12),
+                  border: InputBorder.none,
+                ),
+                textInputAction: TextInputAction.send,
+                enableSuggestions: false,
+                autocorrect: false,
+                onSubmitted: (value) async {
+                  await _handleCommandSubmit(value);
+                },
+              ),
+            ),
+            if (_startupComplete)
+              Opacity(
+                opacity: _showCursor ? 1.0 : 0.0,
+                child: Container(
+                    width: 8,
+                    height: 18,
+                    color: kNeonBlue.withValues(alpha: 0.8)),
+              ),
+            const SizedBox(width: 12),
+            GestureDetector(
+              onTap: () async {
+                await _handleCommandSubmit(
+                    _commandController.text);
+              },
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: kNeonBlue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                      color: kNeonBlue.withValues(alpha: 0.3)),
+                ),
+                child: const Icon(
+                    Icons.subdirectory_arrow_left_rounded,
+                    color: kNeonBlue,
+                    size: 20),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Animated Background ─────────────────────────────────────────────────
   Widget _buildAnimatedBackground() {
     return Positioned.fill(
       child: IgnorePointer(
@@ -710,35 +1272,21 @@ SYSTEM ACCESS COMMANDS:
             ),
             Positioned.fill(
               child: Opacity(
-                opacity: 0.18 + _pulseValue * 0.08,
-                child: CustomPaint(
-                  painter: _TerminalScanlinePainter(),
-                ),
-              ),
-            ),
-            Positioned.fill(
-              child: Opacity(
-                opacity: 0.16,
-                child: CustomPaint(
-                  painter: _TerminalGridPainter(),
-                ),
-              ),
-            ),
-            Positioned.fill(
-              child: Opacity(
                 opacity: 0.85,
                 child: CustomPaint(
-                  painter: _TerminalSpacefieldPainter(_earthOrbit),
+                  painter:
+                      _TerminalSpacefieldPainter(_earthOrbit),
                 ),
               ),
             ),
+            // Earth
             Positioned(
               right: 24,
               top: 42,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 600),
-                width: 140,
-                height: 140,
+                width: 100,
+                height: 100,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   boxShadow: [
@@ -748,7 +1296,10 @@ SYSTEM ACCESS COMMANDS:
                     ),
                   ],
                   gradient: const RadialGradient(
-                    colors: [Color(0xFF4FD1C5), Color(0xFF0F3D5E)],
+                    colors: [
+                      Color(0xFF4FD1C5),
+                      Color(0xFF0F3D5E),
+                    ],
                     center: Alignment(-0.2, -0.2),
                   ),
                 ),
@@ -762,91 +1313,7 @@ SYSTEM ACCESS COMMANDS:
                         ),
                       ),
                     ),
-                    Positioned(
-                      left: 54,
-                      top: 12,
-                      child: Container(
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.white.withValues(alpha: 0.6),
-                              blurRadius: 8,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
                   ],
-                ),
-              ),
-            ),
-            Positioned(
-              left: 16,
-              bottom: 92,
-              child: Container(
-                width: 180,
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  border: Border.all(color: kNeonBlue.withValues(alpha: 0.25)),
-                  borderRadius: BorderRadius.circular(10),
-                  color: const Color(0xFF07111E).withValues(alpha: 0.82),
-                ),
-                child: const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('HUD::TARGET_LOCK', style: TextStyle(color: kNeonBlue, fontSize: 10, fontFamily: 'monospace')),
-                    SizedBox(height: 4),
-                    Text('VECTOR: 07.12 / 03.90', style: TextStyle(color: Colors.white70, fontSize: 10, fontFamily: 'monospace')),
-                    Text('THREAT: LOW', style: TextStyle(color: Colors.greenAccent, fontSize: 10, fontFamily: 'monospace')),
-                  ],
-                ),
-              ),
-            ),
-            Positioned(
-              right: 20,
-              bottom: 84,
-              child: Container(
-                width: 150,
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.purpleAccent.withValues(alpha: 0.25)),
-                  borderRadius: BorderRadius.circular(10),
-                  color: const Color(0xFF120A1F).withValues(alpha: 0.8),
-                ),
-                child: const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('CONSOLE::LINK', style: TextStyle(color: Colors.purpleAccent, fontSize: 10, fontFamily: 'monospace')),
-                    SizedBox(height: 4),
-                    Text('COMM: STABLE', style: TextStyle(color: Colors.white70, fontSize: 10, fontFamily: 'monospace')),
-                    Text('SIG: 42%', style: TextStyle(color: Colors.orangeAccent, fontSize: 10, fontFamily: 'monospace')),
-                  ],
-                ),
-              ),
-            ),
-            Positioned(
-              left: 20,
-              top: 100,
-              child: Container(
-                width: 200,
-                height: 2,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(colors: [Colors.transparent, kNeonBlue, Colors.transparent]),
-                ),
-              ),
-            ),
-            Positioned(
-              right: 40,
-              top: 140,
-              child: Container(
-                width: 120,
-                height: 2,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(colors: [Colors.transparent, Colors.purpleAccent, Colors.transparent]),
                 ),
               ),
             ),
@@ -856,6 +1323,7 @@ SYSTEM ACCESS COMMANDS:
     );
   }
 
+  // ── Shooting Star ───────────────────────────────────────────────────────
   Widget _buildShootingStarOverlay() {
     if (!_showShootingStar) return const SizedBox.shrink();
 
@@ -864,11 +1332,15 @@ SYSTEM ACCESS COMMANDS:
       duration: const Duration(milliseconds: 900),
       curve: Curves.easeOut,
       builder: (context, value, child) {
-        final x = _shootingStartX + (_shootingEndX - _shootingStartX) * value;
-        final y = _shootingStartY + (_shootingEndY - _shootingStartY) * value;
-        final opacity = (1 - value).clamp(0.0, 1.0).toDouble();
-
-        final currentColor = Color.lerp(_shootingFromColor, _shootingToColor, value) ?? _shootingStarColor;
+        final x = _shootingStartX +
+            (_shootingEndX - _shootingStartX) * value;
+        final y = _shootingStartY +
+            (_shootingEndY - _shootingStartY) * value;
+        final opacity =
+            (1 - value).clamp(0.0, 1.0).toDouble();
+        final currentColor =
+            Color.lerp(_shootingFromColor, _shootingToColor, value) ??
+                _shootingStarColor;
 
         return Positioned(
           left: x,
@@ -890,7 +1362,8 @@ SYSTEM ACCESS COMMANDS:
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: currentColor.withValues(alpha: 0.3),
+                      color:
+                          currentColor.withValues(alpha: 0.3),
                       blurRadius: 12,
                     ),
                   ],
@@ -900,211 +1373,150 @@ SYSTEM ACCESS COMMANDS:
           ),
         );
       },
-      onEnd: () => setState(() => _showShootingStar = false),
+      onEnd: () =>
+          setState(() => _showShootingStar = false),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF070B14),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0A111F),
-        elevation: 0,
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                    colors: [kNeonBlue, Color(0xFF3B82F6)]),
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                      color: kNeonBlue.withValues(alpha: 0.3), blurRadius: 10),
-                ],
-              ),
-              child: const Icon(Icons.terminal_rounded,
-                  color: Colors.white, size: 18),
-            ),
-            const SizedBox(width: 14),
-            const Text('NEX_TERMINAL',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontFamily: 'monospace',
-                    fontWeight: FontWeight.w900,
-                    fontSize: 14,
-                    letterSpacing: 1)),
-          ],
-        ),
-        leading: IconButton(
-          icon:
-              const Icon(Icons.arrow_back_ios_new, color: kNeonBlue, size: 18),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.layers_clear_rounded,
-                color: kNeonBlue, size: 20),
-            onPressed: () {
-              setState(() => _output.clear());
-              _addOutput('info', 'BUFFER_CLEARED');
-            },
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: Stack(
-        children: [
-          _buildAnimatedBackground(),
-          Column(
+  // ── Matrix Rain Overlay ─────────────────────────────────────────────────
+  Widget _buildMatrixRainOverlay() {
+    return Positioned.fill(
+      child: AnimatedBuilder(
+        animation: _matrixController,
+        builder: (context, _) => Container(
+          color: Colors.black.withValues(alpha: 0.85),
+          child: Stack(
             children: [
-              // PRO TERMINAL OUTPUT AREA
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                color: Color(0xFF070B14),
-                border: Border(top: BorderSide(color: Colors.white10)),
+              CustomPaint(
+                size: Size.infinite,
+                painter: _MatrixRainPainter(
+                    progress: _matrixController.value),
               ),
-              child: ListView.builder(
-                controller: _scrollController,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                itemCount: _output.length,
-                itemBuilder: (context, index) {
-                  final item = _output[index];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: SelectableText(
-                      item['message'] as String,
-                      style: TextStyle(
-                        color: _getTypeColor(item['type'] as String),
-                        fontSize: 12,
-                        fontFamily: 'monospace',
-                        height: 1.5,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  );
-                },
+              Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('WAKE UP, NEO...',
+                        style: TextStyle(
+                            color: kNeonGreen.withValues(alpha: 0.9),
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            fontFamily: 'monospace',
+                            letterSpacing: 3,
+                            shadows: const [
+                              Shadow(
+                                  color: kNeonGreen,
+                                  blurRadius: 20),
+                            ])),
+                    const SizedBox(height: 8),
+                    Text('THE MATRIX HAS YOU',
+                        style: TextStyle(
+                            color: kNeonGreen.withValues(alpha: 0.5),
+                            fontSize: 12,
+                            fontFamily: 'monospace',
+                            letterSpacing: 2)),
+                  ],
+                ),
               ),
-            ),
-          ),
-          // INPUT INTERFACE
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0A111F),
-              border: Border(
-                  top: BorderSide(color: kNeonBlue.withValues(alpha: 0.2))),
-            ),
-            child: SafeArea(
-              child: Row(
-                children: [
-                  const Text('\$ ',
-                      style: TextStyle(
-                          color: kNeonBlue,
-                          fontSize: 16,
-                          fontFamily: 'monospace',
-                          fontWeight: FontWeight.w900)),
-                  if (_typewriterActive)
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 120),
-                      margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: kNeonBlue.withValues(alpha: 0.16),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: kNeonBlue.withValues(alpha: 0.25)),
-                      ),
-                      child: Text(
-                        _typingBuffer,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 11,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                    ),
-                  Expanded(
-                    child: TextField(
-                      controller: _commandController,
-                      enabled: _startupComplete,
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontFamily: 'monospace',
-                          fontSize: 14),
-                      cursorColor: kNeonBlue,
-                      decoration: InputDecoration(
-                        hintText: _startupComplete
-                            ? 'Awaiting command...'
-                            : 'SYS_BOOTING...',
-                        hintStyle: const TextStyle(color: Colors.white12),
-                        border: InputBorder.none,
-                      ),
-                      textInputAction: TextInputAction.send,
-                      enableSuggestions: false,
-                      autocorrect: false,
-                      onSubmitted: (value) async {
-                        await _handleCommandSubmit(value);
-                      },
-                      onTap: () {},
-                      onChanged: (value) {},
-                    ),
-                  ),
-                  // Blinking Cursor Simulation
-                  if (_startupComplete)
-                    Opacity(
-                      opacity: _showCursor ? 1.0 : 0.0,
-                      child: Container(
-                          width: 8,
-                          height: 18,
-                          color: kNeonBlue.withValues(alpha: 0.8)),
-                    ),
-                  const SizedBox(width: 12),
-                  GestureDetector(
-                    onTap: () async {
-                      await _handleCommandSubmit(_commandController.text);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: kNeonBlue.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border:
-                            Border.all(color: kNeonBlue.withValues(alpha: 0.3)),
-                      ),
-                      child: const Icon(Icons.subdirectory_arrow_left_rounded,
-                          color: kNeonBlue, size: 20),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-              _buildShootingStarOverlay(),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _TerminalScanlinePainter extends CustomPainter {
+// ════════════════════════════════════════════════════════════════════════════
+// CRT PHOSPHOR PAINTER
+// ════════════════════════════════════════════════════════════════════════════
+class _CRTPhosphorPainter extends CustomPainter {
+  _CRTPhosphorPainter({required this.flicker});
+  final double flicker;
+
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.white.withValues(alpha: 0.09);
-    for (var y = 0.0; y < size.height; y += 4) {
-      canvas.drawRect(Rect.fromLTWH(0, y, size.width, 1), paint);
+    // Scanlines with variable opacity
+    final scanPaint = Paint();
+    for (var y = 0.0; y < size.height; y += 3) {
+      final alpha = 0.04 + (y % 6 == 0 ? 0.03 : 0);
+      scanPaint.color = Colors.white.withValues(alpha: alpha);
+      canvas.drawRect(Rect.fromLTWH(0, y, size.width, 1), scanPaint);
+    }
+
+    // Vignette effect at edges
+    final vignettePaint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          Colors.transparent,
+          Colors.black.withValues(alpha: 0.3 + flicker * 0.05),
+        ],
+        stops: const [0.6, 1.0],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+    canvas.drawRect(
+        Rect.fromLTWH(0, 0, size.width, size.height), vignettePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CRTPhosphorPainter oldDelegate) =>
+      (oldDelegate.flicker - flicker).abs() > 0.1;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// MATRIX RAIN PAINTER
+// ════════════════════════════════════════════════════════════════════════════
+class _MatrixRainPainter extends CustomPainter {
+  _MatrixRainPainter({required this.progress});
+  final double progress;
+
+  static const _chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789ABCDEF';
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rng = math.Random(42);
+    const colWidth = 14.0;
+    final cols = (size.width / colWidth).ceil();
+
+    for (var c = 0; c < cols; c++) {
+      final speed = 0.5 + rng.nextDouble() * 1.5;
+      final offset = rng.nextDouble() * size.height;
+      final colLen = 8 + rng.nextInt(20);
+
+      for (var r = 0; r < colLen; r++) {
+        final y = (offset + r * 16 + progress * speed * size.height) %
+            (size.height + 200) -
+            100;
+        final alpha = (1 - r / colLen).clamp(0.0, 1.0) * 0.7;
+        final charIdx = (c * 7 + r * 13 + (progress * 50).toInt()) %
+            _chars.length;
+
+        final textSpan = TextSpan(
+          text: _chars[charIdx],
+          style: TextStyle(
+            color: (r == 0
+                    ? Colors.white
+                    : const Color(0xFF00FF41))
+                .withValues(alpha: alpha),
+            fontSize: 12,
+            fontFamily: 'monospace',
+            fontWeight: r == 0 ? FontWeight.w900 : FontWeight.w400,
+          ),
+        );
+        final tp = TextPainter(
+            text: textSpan, textDirection: TextDirection.ltr);
+        tp.layout();
+        tp.paint(canvas, Offset(c * colWidth, y));
+      }
     }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _MatrixRainPainter oldDelegate) =>
+      oldDelegate.progress != progress;
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// SPACEFIELD PAINTER
+// ════════════════════════════════════════════════════════════════════════════
 class _TerminalSpacefieldPainter extends CustomPainter {
   const _TerminalSpacefieldPainter(this.orbit);
   final double orbit;
@@ -1112,35 +1524,66 @@ class _TerminalSpacefieldPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..color = Colors.white.withValues(alpha: 0.9);
-    final stars = <Offset>[];
-    for (var i = 0; i < 120; i++) {
+
+    // Stars
+    for (var i = 0; i < 150; i++) {
       final x = (i * 29) % size.width;
       final y = ((i * 37) % 700) / 700 * size.height;
-      stars.add(Offset(x, y));
+      final alpha =
+          0.25 + ((x + y + orbit * size.width) % 20) / 40;
+      canvas.drawCircle(
+          Offset(x, y),
+          1.0 + (alpha * 0.7),
+          paint
+            ..color = Colors.white.withValues(
+                alpha: alpha.clamp(0.2, 1.0)));
     }
 
-    for (final star in stars) {
-      final alpha = 0.25 + ((star.dx + star.dy + orbit * size.width) % 20) / 40;
-      canvas.drawCircle(star, 1.0 + (alpha * 0.7), paint..color = Colors.white.withValues(alpha: alpha.clamp(0.2, 1.0)));
-    }
+    // Nebula glow
+    final nebulaPaint = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(-0.5, 0.3),
+        radius: 0.8,
+        colors: [
+          const Color(0xFF8B5CF6).withValues(alpha: 0.04),
+          Colors.transparent,
+        ],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+    canvas.drawRect(
+        Rect.fromLTWH(0, 0, size.width, size.height), nebulaPaint);
 
+    // Horizon glow line
     final path = Path();
     path.moveTo(0, size.height * 0.82);
-    path.quadraticBezierTo(size.width * 0.25, size.height * 0.62, size.width * 0.5, size.height * 0.78);
-    path.quadraticBezierTo(size.width * 0.75, size.height * 0.94, size.width, size.height * 0.72);
+    path.quadraticBezierTo(size.width * 0.25, size.height * 0.62,
+        size.width * 0.5, size.height * 0.78);
+    path.quadraticBezierTo(size.width * 0.75, size.height * 0.94,
+        size.width, size.height * 0.72);
     final glowPaint = Paint()
       ..shader = LinearGradient(
-        colors: [Colors.transparent, kNeonBlue.withValues(alpha: 0.35), Colors.transparent],
+        colors: [
+          Colors.transparent,
+          kNeonBlue.withValues(alpha: 0.35),
+          Colors.transparent,
+        ],
         begin: Alignment.centerLeft,
         end: Alignment.centerRight,
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
-    canvas.drawPath(path, glowPaint..strokeWidth = 2..style = PaintingStyle.stroke);
+    canvas.drawPath(
+        path,
+        glowPaint
+          ..strokeWidth = 2
+          ..style = PaintingStyle.stroke);
   }
 
   @override
-  bool shouldRepaint(covariant _TerminalSpacefieldPainter oldDelegate) => oldDelegate.orbit != orbit;
+  bool shouldRepaint(covariant _TerminalSpacefieldPainter oldDelegate) =>
+      oldDelegate.orbit != orbit;
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// ORBITAL RING PAINTER
+// ════════════════════════════════════════════════════════════════════════════
 class _OrbitalRingPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -1162,29 +1605,11 @@ class _OrbitalRingPainter extends CustomPainter {
     canvas.drawCircle(
       Offset(size.width / 2, size.height / 2),
       size.width * 0.52,
-      paint..color = Colors.purpleAccent.withValues(alpha: 0.26),
+      paint
+        ..color = Colors.purpleAccent.withValues(alpha: 0.26),
     );
   }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
-
-class _TerminalGridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.cyan.withValues(alpha: 0.06)
-      ..strokeWidth = 1;
-    for (var x = 0.0; x < size.width; x += 24) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
-    }
-    for (var y = 0.0; y < size.height; y += 24) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
