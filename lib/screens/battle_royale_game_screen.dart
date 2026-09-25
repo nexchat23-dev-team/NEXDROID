@@ -532,7 +532,7 @@ class _BattleRoyaleGameScreenState extends State<BattleRoyaleGameScreen>
             right: 0,
             child: Center(
               child: Text(
-                "🟢 ${_bots.length + (_player.isDead ? 0 : 1)} ALIVE",
+                "${_bots.length + (_player.isDead ? 0 : 1)} ALIVE",
                 style: const TextStyle(color: kNeonGreen, fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),

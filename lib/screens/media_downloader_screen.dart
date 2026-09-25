@@ -42,10 +42,10 @@ class _MediaDownloaderScreenState extends State<MediaDownloaderScreen>
     {'label': '480p SD', 'quality': '480p', 'format': 'mp4', 'badge': 'SD', 'bitrate': '2.5 Mbps', 'size': '~150 MB/hr'},
     {'label': 'WEBM VP9', 'quality': '1080p', 'format': 'webm', 'badge': 'VP9', 'bitrate': '6 Mbps', 'size': '~380 MB/hr'},
     {'label': 'MKV HEVC', 'quality': '1080p', 'format': 'mkv', 'badge': 'H265', 'bitrate': '4 Mbps', 'size': '~250 MB/hr'},
-    {'label': 'MP3 320K', 'quality': '320kbps', 'format': 'mp3', 'badge': '🎵', 'bitrate': '320 kbps', 'size': '~144 MB/hr'},
-    {'label': 'AAC HQ', 'quality': '256kbps', 'format': 'aac', 'badge': '🔊', 'bitrate': '256 kbps', 'size': '~115 MB/hr'},
-    {'label': 'FLAC LOSS', 'quality': '1411kbps', 'format': 'flac', 'badge': '💎', 'bitrate': '1411 kbps', 'size': '~635 MB/hr'},
-    {'label': 'MP3 128K', 'quality': '128kbps', 'format': 'mp3', 'badge': '🎶', 'bitrate': '128 kbps', 'size': '~58 MB/hr'},
+    {'label': 'MP3 320K', 'quality': '320kbps', 'format': 'mp3', 'badge': 'MP3', 'bitrate': '320 kbps', 'size': '~144 MB/hr'},
+    {'label': 'AAC HQ', 'quality': '256kbps', 'format': 'aac', 'badge': 'AAC', 'bitrate': '256 kbps', 'size': '~115 MB/hr'},
+    {'label': 'FLAC LOSS', 'quality': '1411kbps', 'format': 'flac', 'badge': 'FLAC', 'bitrate': '1411 kbps', 'size': '~635 MB/hr'},
+    {'label': 'MP3 128K', 'quality': '128kbps', 'format': 'mp3', 'badge': '128K', 'bitrate': '128 kbps', 'size': '~58 MB/hr'},
   ];
 
   @override

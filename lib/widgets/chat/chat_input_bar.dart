@@ -54,9 +54,15 @@ class _ChatInputBarState extends State<ChatInputBar> {
   static const Color _subText = Color(0xFF9E8DBE);
   static const Color _whiteText = Color(0xFFF5EFFF);
 
-  static const List<String> _quickEmojis = [
-    '😀', '😂', '😍', '🔥', '👍', '🚀', '❤️', '🎉',
-    '💯', '🎮', '👾', '⚡', '🌙', '⭐', '💎', '🛡️',
+  static const List<Map<String, dynamic>> _quickPhrases = [
+    {'text': 'GG WP', 'icon': Icons.sports_esports_rounded, 'color': Color(0xFF00FF66)},
+    {'text': 'Confirmed', 'icon': Icons.check_circle_outline_rounded, 'color': Color(0xFF00E5FF)},
+    {'text': 'On my way', 'icon': Icons.navigation_rounded, 'color': Color(0xFFFF9800)},
+    {'text': 'Call me', 'icon': Icons.phone_in_talk_rounded, 'color': Color(0xFFB44FFF)},
+    {'text': 'Over & Out', 'icon': Icons.radio_button_checked_rounded, 'color': Color(0xFFFF2A6D)},
+    {'text': 'Roger that', 'icon': Icons.done_all_rounded, 'color': Color(0xFF00FFC2)},
+    {'text': 'In match', 'icon': Icons.gamepad_rounded, 'color': Color(0xFFFFD700)},
+    {'text': 'AFK', 'icon': Icons.hourglass_bottom_rounded, 'color': Colors.grey},
   ];
 
   @override
@@ -506,29 +512,46 @@ class _ChatInputBarState extends State<ChatInputBar> {
 
   Widget _buildQuickEmojiDrawer() {
     return Container(
-      height: 60,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: const Color(0xFF100822),
         border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
       ),
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        itemCount: _quickEmojis.length,
+        itemCount: _quickPhrases.length,
         itemBuilder: (context, index) {
-          final emoji = _quickEmojis[index];
+          final item = _quickPhrases[index];
+          final text = item['text'] as String;
+          final icon = item['icon'] as IconData;
+          final color = item['color'] as Color;
           return GestureDetector(
             onTap: () {
               HapticFeedback.selectionClick();
-              _textController.text += emoji;
+              _textController.text = _textController.text.isEmpty ? text : '${_textController.text} $text';
               _textController.selection = TextSelection.fromPosition(
                 TextPosition(offset: _textController.text.length),
               );
             },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 7),
-              child: Center(
-                child: Text(emoji, style: const TextStyle(fontSize: 24)),
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: color.withValues(alpha: 0.35)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 14, color: color),
+                  const SizedBox(width: 5),
+                  Text(
+                    text,
+                    style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.bold),
+                  ),
+                ],
               ),
             ),
           );

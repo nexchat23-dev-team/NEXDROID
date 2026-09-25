@@ -21,11 +21,14 @@ class _AIChatScreenState extends State<AIChatScreen>
   late final AnimationController _pulseController;
   final List<Map<String, dynamic>> _messages = [];
   bool _isLoading = false;
-  String _serviceStatus = '⚡ NEX NEURAL CORE 3.0 (ACTIVE)';
+  String _serviceStatus = 'NEX CHRONEX CLOUD (ACTIVE)';
   bool _isOllamaOnline = false;
   String _currentHost = 'http://10.0.2.2:11434';
 
   final List<Map<String, String>> _modelOptions = const [
+    {'key': 'gemini-flash-lite', 'label': 'ChronEX Gemini Flash Lite (NEXCHAT Multi-Key Cloud)', 'model': 'gemini-flash-lite-latest'},
+    {'key': 'gemini-flash', 'label': 'ChronEX Gemini Flash (High Performance Cloud)', 'model': 'gemini-flash-latest'},
+    {'key': 'gemini-pro', 'label': 'ChronEX Gemini Pro (Deep Logic & Code Cloud)', 'model': 'gemini-pro-latest'},
     {'key': 'qwen3.8', 'label': 'Qwen 3.8 (Quantum Velocity)', 'model': 'qwen3.8'},
     {'key': 'deepseek-v4', 'label': 'DeepSeek V4 Flash Cloud (Ultra Reasoning)', 'model': 'deepseek-v4-flash:cloud'},
     {'key': 'kimi-k3', 'label': 'Kimi K3 Cloud (Long-Context Engine)', 'model': 'kimi-k3:cloud'},
@@ -39,14 +42,14 @@ class _AIChatScreenState extends State<AIChatScreen>
   ];
 
   final List<String> _suggestedPrompts = const [
-    '💻 Write a high-performance Flutter state controller',
-    '🏎️ Give me Cyber Racer 2099 high score secrets',
-    '🛡️ Run a network cyber defense diagnostic',
-    '💎 How do I purchase NEX VIP Tokens via Telegram?',
-    '⚡ Explain NEX dual-sync database architecture',
+    'Write a high-performance Flutter state controller',
+    'Give me Cyber Racer 2099 high score secrets',
+    'Run a network cyber defense diagnostic',
+    'How do I purchase NEX VIP Tokens via Telegram?',
+    'Explain NEX dual-sync database architecture',
   ];
 
-  String _selectedModelKey = 'dolphin3';
+  String _selectedModelKey = 'gemini-flash-lite';
 
   String get _selectedModel {
     return _modelOptions
@@ -65,7 +68,7 @@ class _AIChatScreenState extends State<AIChatScreen>
     _messages.add({
       'role': 'assistant',
       'content':
-          '⚡ **NEX INTELLIGENCE HUB ONLINE**\n\nI am **NEX AI**, powered by the dual-engine **Ollama LLM Interface** and the **NEX Neural Core 3.0**. I provide high-velocity code generation, cyber diagnostics, ecosystem navigation, and gaming algorithms.\n\n*Tap the ⚙️ settings icon to link your custom Ollama server IP or choose neural models!*',
+          '**NEX CHRONEX INTELLIGENCE HUB ONLINE**\n\nI am **NEX AI (ChronEX Core)**, powered directly by **NEXCHAT Google Gemini API Cloud Pool (Multi-Key Rotation & Auto-Failover)** and local neural backups. I provide high-velocity code generation, cyber diagnostics, and system architecture.\n\n*Tap the configuration icon to select models, test keys, or link a local server!*',
       'time': DateTime.now().toIso8601String(),
     });
     _refreshServiceStatus();
@@ -118,9 +121,13 @@ class _AIChatScreenState extends State<AIChatScreen>
     String aiResponse;
 
     try {
-      aiResponse = await AIService.instance.chat(message, model: _selectedModel);
+      aiResponse = await AIService.instance.chat(
+        message,
+        model: _selectedModel,
+        conversationHistory: _messages,
+      );
     } catch (e) {
-      aiResponse = '⚡ [NEURAL FALLBACK] Processed query: $message\n\nNEX AI is running directly on local neural matrix. Error connecting to external host: $e';
+      aiResponse = '[NEURAL FALLBACK] Processed query: $message\n\nNEX AI is running directly on local neural matrix. Error connecting to external host: $e';
     }
 
     await _refreshServiceStatus();
@@ -194,7 +201,7 @@ class _AIChatScreenState extends State<AIChatScreen>
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          '⚡ AI CORE CONFIGURATION',
+                          'AI CORE CONFIGURATION',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 16,
@@ -214,7 +221,7 @@ class _AIChatScreenState extends State<AIChatScreen>
                             ),
                           ),
                           child: Text(
-                            _isOllamaOnline ? 'OLLAMA CONNECTED' : 'LOCAL NEURAL ACTIVE',
+                            _isOllamaOnline ? 'OLLAMA CONNECTED' : 'CHRONEX CLOUD READY',
                             style: TextStyle(
                               color: _isOllamaOnline ? kNeonGreen : Colors.cyan,
                               fontSize: 10,
@@ -258,8 +265,8 @@ class _AIChatScreenState extends State<AIChatScreen>
                             setModalState(() {
                               testing = false;
                               testResult = ok
-                                  ? '✅ Successfully connected to Ollama!'
-                                  : '❌ Server unreachable. NEX Neural Core will handle queries automatically.';
+                                  ? '[CONNECTED] Successfully connected to Ollama!'
+                                  : '[OFFLINE] Server unreachable. ChronEX Gemini Cloud will handle queries automatically.';
                             });
                           },
                         ),
@@ -270,7 +277,7 @@ class _AIChatScreenState extends State<AIChatScreen>
                       Text(
                         testResult!,
                         style: TextStyle(
-                          color: testResult!.startsWith('✅') ? kNeonGreen : Colors.orangeAccent,
+                          color: testResult!.startsWith('[CONNECTED]') ? kNeonGreen : Colors.orangeAccent,
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
                         ),
@@ -430,7 +437,7 @@ class _AIChatScreenState extends State<AIChatScreen>
                 _messages.clear();
                 _messages.add({
                   'role': 'assistant',
-                  'content': '⚡ Neural session reset. Ready for new operations.',
+                  'content': 'Neural session reset. ChronEX AI is ready for new operations.',
                   'time': DateTime.now().toIso8601String(),
                 });
               });
@@ -469,8 +476,12 @@ class _AIChatScreenState extends State<AIChatScreen>
                       Tooltip(
                         message: _serviceStatus,
                         child: _buildStatusChip(
-                          _isOllamaOnline ? '🟢 OLLAMA LIVE' : '⚡ NEURAL CORE 3.0',
-                          _isOllamaOnline ? kNeonGreen : Colors.cyanAccent,
+                          _selectedModelKey.startsWith('gemini')
+                              ? 'CHRONEX GEMINI LIVE'
+                              : (_isOllamaOnline ? 'OLLAMA LIVE' : 'NEURAL CORE 3.0'),
+                          _selectedModelKey.startsWith('gemini')
+                              ? Colors.cyanAccent
+                              : (_isOllamaOnline ? kNeonGreen : Colors.cyanAccent),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -482,7 +493,7 @@ class _AIChatScreenState extends State<AIChatScreen>
                       GestureDetector(
                         onTap: _showSettingsSheet,
                         child: _buildStatusChip(
-                          'CONFIG ⚙️',
+                          'CONFIG',
                           Colors.white70,
                         ),
                       ),

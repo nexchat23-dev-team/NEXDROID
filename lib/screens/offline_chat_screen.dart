@@ -119,7 +119,7 @@ class _OfflineChatScreenState extends State<OfflineChatScreen>
 
     _messagesSub = _bluetoothService.messageStream.listen((message) {
       if (!mounted) return;
-      if (message.text.startsWith('🚨 [SOS')) {
+      if (message.text.startsWith('[SOS')) {
         _soundService.playSuperLaser();
         HapticFeedback.heavyImpact();
       } else {
@@ -383,21 +383,21 @@ class _OfflineChatScreenState extends State<OfflineChatScreen>
     String payload;
     switch (actionCode) {
       case 'SOS':
-        payload = '🚨 [SOS EMERGENCY] Operative $_localDisplayName beacon broadcasted! Assistance required!';
+        payload = '[SOS EMERGENCY] Operative $_localDisplayName beacon broadcasted! Assistance required!';
         _soundService.playSuperLaser();
         break;
       case 'COORD':
         final randLat = (37.7749 + (Random().nextDouble() - 0.5) * 0.02).toStringAsFixed(4);
         final randLon = (-122.4194 + (Random().nextDouble() - 0.5) * 0.02).toStringAsFixed(4);
-        payload = '📍 [GRID COORD] Loc: $randLat, $randLon • Altitude: 42m • Sector Alpha';
+        payload = '[GRID COORD] Loc: $randLat, $randLon • Altitude: 42m • Sector Alpha';
         _soundService.playTick();
         break;
       case 'ACK':
-        payload = '✅ [ACK] Transmission received and acknowledged.';
+        payload = '[ACK] Transmission received and acknowledged.';
         _soundService.playTick();
         break;
       case 'CLEAR':
-        payload = '🛡️ [ALL CLEAR] Local perimeter checked. Zero hostiles detected.';
+        payload = '[ALL CLEAR] Local perimeter checked. Zero hostiles detected.';
         _soundService.playTick();
         break;
       default:
@@ -1107,7 +1107,7 @@ class _OfflineChatScreenState extends State<OfflineChatScreen>
       itemBuilder: (context, index) {
         final message = _messages[index];
         final isMe = message.sender == 'You';
-        final isSOS = message.text.contains('🚨 [SOS');
+        final isSOS = message.text.contains('[SOS');
 
         return Align(
           alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -1231,7 +1231,7 @@ class _OfflineChatScreenState extends State<OfflineChatScreen>
                 children: [
                   Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 14),
                   SizedBox(width: 6),
-                  Text('🚨 SOS BEACON', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w900, fontSize: 11)),
+                  Text('SOS BEACON', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w900, fontSize: 11)),
                 ],
               ),
             ),
@@ -1239,15 +1239,15 @@ class _OfflineChatScreenState extends State<OfflineChatScreen>
           const SizedBox(width: 8),
 
           // COORD
-          _buildQuickChip('📍 COORD', () => _sendQuickAction('COORD')),
+          _buildQuickChip('COORD', () => _sendQuickAction('COORD')),
           const SizedBox(width: 8),
 
           // ACK
-          _buildQuickChip('✅ ACK', () => _sendQuickAction('ACK')),
+          _buildQuickChip('ACK', () => _sendQuickAction('ACK')),
           const SizedBox(width: 8),
 
           // ALL CLEAR
-          _buildQuickChip('🛡️ ALL CLEAR', () => _sendQuickAction('CLEAR')),
+          _buildQuickChip('ALL CLEAR', () => _sendQuickAction('CLEAR')),
         ],
       ),
     );

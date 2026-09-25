@@ -1,8 +1,14 @@
+import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import '../utils/constants.dart';
+import 'package:video_player/video_player.dart';
 import '../screens/video_post_screen.dart';
 import '../services/ai_service.dart';
+import '../services/reel_service.dart';
+import '../utils/constants.dart';
 
 class VideoFeedScreen extends StatefulWidget {
   static const routeName = '/video-feed';
@@ -20,18 +26,20 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
   String _selectedCategory = 'For You';
   int _currentPage = 0;
 
+  StreamSubscription<List<Map<String, dynamic>>>? _reelsSubscription;
+
   // Double-tap heart particles
   final List<_FloatingHeart> _floatingHearts = [];
 
   final List<String> _categories = const ['For You', 'Trending', 'Gaming', 'Music', 'Tech', 'Comedy'];
 
-  late final List<Map<String, dynamic>> _allVideos = [
+  static final List<Map<String, dynamic>> _curatedTemplates = [
     {
-      'id': '1',
+      'id': 'template_1',
       'username': 'alex_creates',
       'avatar': 'A',
       'category': 'Music',
-      'title': 'Studio Session Drop 🎵',
+      'title': 'Studio Session Drop',
       'description': 'Fresh synth beats recorded live in the NEX audio engine. Sound on!',
       'hashtags': '#beats #nexreels #synthwave',
       'soundTrack': 'Alex Creates • Cyber Midnight Mix',
@@ -46,14 +54,15 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
       'followed': false,
       'accent': const Color(0xFF8B5CF6),
       'mediaLabel': 'Music mix',
+      'videoUrl': '',
     },
     {
-      'id': '2',
+      'id': 'template_2',
       'username': 'dev_life',
       'avatar': 'D',
       'category': 'For You',
-      'title': 'Building NEXDROID 🚀',
-      'description': 'Shipping real-time group chat, dark neon design system & quantum UI.',
+      'title': 'Building NEXDROID',
+      'description': 'Shipping real-time group chat, dark neon design system and quantum UI.',
       'hashtags': '#flutter #buildinpublic #nexchat',
       'soundTrack': 'Dev Life • Code & Chill Lofi',
       'likes': 28910,
@@ -67,13 +76,14 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
       'followed': true,
       'accent': const Color(0xFF22C55E),
       'mediaLabel': 'Tech Dev Vlog',
+      'videoUrl': '',
     },
     {
-      'id': '3',
+      'id': 'template_3',
       'username': 'gaming_pro',
       'avatar': 'G',
       'category': 'Gaming',
-      'title': 'High Stakes Aviator Clutch ✈️',
+      'title': 'High Stakes Aviator Clutch',
       'description': 'Multiplied by 48.5x at the exact last second! Pure tension.',
       'hashtags': '#aviator #gaming #nexbets',
       'soundTrack': 'NEX Gaming Core • Hype Bass',
@@ -88,13 +98,14 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
       'followed': false,
       'accent': const Color(0xFF3B82F6),
       'mediaLabel': 'Gameplay clip',
+      'videoUrl': '',
     },
     {
-      'id': '4',
+      'id': 'template_4',
       'username': 'cosmic_art',
       'avatar': 'C',
       'category': 'Trending',
-      'title': 'Cyberpunk Shaders 🎨',
+      'title': 'Cyberpunk Shaders',
       'description': 'Procedural aurora particle simulations rendered at 60 FPS in Flutter canvas.',
       'hashtags': '#cyberpunk #art #motion',
       'soundTrack': 'Cosmic Art • Neon Waves',
@@ -109,13 +120,14 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
       'followed': false,
       'accent': const Color(0xFFEC4899),
       'mediaLabel': 'Motion graphics',
+      'videoUrl': '',
     },
     {
-      'id': '5',
+      'id': 'template_5',
       'username': 'tech_insider',
       'avatar': 'T',
       'category': 'Tech',
-      'title': 'Rust Security Engine Demo 🔒',
+      'title': 'Rust Security Engine Demo',
       'description': 'NEXDROID root scanner detecting unauthorized su binaries in real-time.',
       'hashtags': '#security #rust #nexdroid',
       'soundTrack': 'Tech Insider • Digital Fortress',
@@ -130,13 +142,14 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
       'followed': false,
       'accent': const Color(0xFF06B6D4),
       'mediaLabel': 'Security Demo',
+      'videoUrl': '',
     },
     {
-      'id': '6',
+      'id': 'template_6',
       'username': 'comedy_king',
       'avatar': 'K',
       'category': 'Comedy',
-      'title': 'When the code compiles first try 😂',
+      'title': 'When the code compiles first try',
       'description': 'That feeling when flutter analyze returns 0 errors...',
       'hashtags': '#coding #comedy #relatable',
       'soundTrack': 'Comedy King • Laugh Track Remix',
@@ -151,8 +164,11 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
       'followed': false,
       'accent': const Color(0xFFF59E0B),
       'mediaLabel': 'Comedy skit',
+      'videoUrl': '',
     },
   ];
+
+  List<Map<String, dynamic>> _allVideos = List.from(_curatedTemplates);
 
   List<Map<String, dynamic>> get _videos {
     if (_selectedCategory == 'For You') return _allVideos;
@@ -174,10 +190,58 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
       vsync: this,
       duration: const Duration(milliseconds: 800),
     );
+
+    _listenToLiveReels();
+  }
+
+  void _listenToLiveReels() {
+    _reelsSubscription = ReelService.instance.getReelsStream().listen(
+      (firestoreReels) {
+        if (!mounted) return;
+        setState(() {
+          final Set<String> existingIds = {};
+          final merged = <Map<String, dynamic>>[];
+
+          for (final reel in firestoreReels) {
+            final id = reel['id']?.toString() ?? '';
+            if (id.isNotEmpty) existingIds.add(id);
+            reel['accent'] = reel['accent'] ?? _pickAccentColor(id);
+            reel['mediaLabel'] = reel['mediaLabel'] ?? 'NEX Clip';
+            reel['category'] = reel['category'] ?? 'For You';
+            merged.add(reel);
+          }
+
+          for (final template in _curatedTemplates) {
+            final tid = template['id']?.toString() ?? '';
+            if (!existingIds.contains(tid)) {
+              merged.add(Map<String, dynamic>.from(template));
+            }
+          }
+
+          _allVideos = merged;
+        });
+      },
+      onError: (err) {
+        debugPrint('[VideoFeedScreen] Firestore reels stream notice: $err');
+      },
+    );
+  }
+
+  Color _pickAccentColor(String seed) {
+    const accents = [
+      kNeonPurple,
+      kNeonBlue,
+      kNeonGreen,
+      Color(0xFFEC4899),
+      Color(0xFF06B6D4),
+      Color(0xFFF59E0B),
+    ];
+    return accents[seed.hashCode.abs() % accents.length];
   }
 
   @override
   void dispose() {
+    _reelsSubscription?.cancel();
     _discAnim.dispose();
     _equalizerAnim.dispose();
     _heartBurstAnim.dispose();
@@ -201,39 +265,51 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
         'liked': false,
         'saved': false,
         'followed': false,
-        'accent': reel['accent'] ?? const Color(0xFFB23BFF),
+        'accent': reel['accent'] ?? kNeonPurple,
+        'videoUrl': reel['mediaUrl'] ?? reel['videoUrl'] ?? '',
       });
     });
-    _pageController.jumpToPage(0);
+    if (_pageController.hasClients) {
+      _pageController.jumpToPage(0);
+    }
   }
 
   void _toggleLike(int index) {
+    if (index >= _videos.length) return;
+    final video = _videos[index];
+    final bool currentlyLiked = (video['liked'] as bool?) ?? false;
+    final int currentLikes = (video['likes'] as int?) ?? 0;
+
     setState(() {
-      final liked = _videos[index]['liked'] as bool;
-      _videos[index]['liked'] = !liked;
-      if (!liked) {
-        _videos[index]['likes'] = (_videos[index]['likes'] as int) + 1;
-      } else {
-        _videos[index]['likes'] = (_videos[index]['likes'] as int) - 1;
-      }
+      video['liked'] = !currentlyLiked;
+      video['likes'] = !currentlyLiked ? currentLikes + 1 : (currentLikes > 0 ? currentLikes - 1 : 0);
     });
+
+    final reelId = video['id']?.toString();
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (reelId != null && uid != null && !reelId.startsWith('template_')) {
+      ReelService.instance.toggleLikeReel(reelId, uid, currentlyLiked);
+    }
   }
 
   void _toggleSave(int index) {
+    if (index >= _videos.length) return;
     setState(() {
-      _videos[index]['saved'] = !(_videos[index]['saved'] as bool);
+      _videos[index]['saved'] = !((_videos[index]['saved'] as bool?) ?? false);
     });
   }
 
   void _toggleFollow(int index) {
+    if (index >= _videos.length) return;
     setState(() {
-      _videos[index]['followed'] = !(_videos[index]['followed'] as bool);
+      _videos[index]['followed'] = !((_videos[index]['followed'] as bool?) ?? false);
     });
   }
 
   // Double-tap to like with floating heart particle burst
   void _onDoubleTap(int index, TapDownDetails? details) {
-    if (!(_videos[index]['liked'] as bool)) {
+    if (index >= _videos.length) return;
+    if (!((_videos[index]['liked'] as bool?) ?? false)) {
       _toggleLike(index);
     }
     _heartBurstAnim.forward(from: 0.0);
@@ -271,13 +347,13 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
   }
 
   void _showCommentSheet(int index) {
+    if (index >= _videos.length) return;
+    final video = _videos[index];
+    final reelId = video['id']?.toString() ?? '';
     final controller = TextEditingController();
     final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final List<Map<String, String>> comments = [
-      {'user': 'nex_fan_01', 'text': 'This is 🔥🔥🔥'},
-      {'user': 'flutter_dev', 'text': 'Incredible work! How long did this take?'},
-      {'user': 'cyber_ninja', 'text': 'The animations are insane 💯'},
-    ];
+    final user = FirebaseAuth.instance.currentUser;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -286,59 +362,94 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (sheetContext) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        minChildSize: 0.3,
-        maxChildSize: 0.85,
+        initialChildSize: 0.65,
+        minChildSize: 0.35,
+        maxChildSize: 0.9,
         expand: false,
         builder: (_, scrollController) => Column(
           children: [
             const SizedBox(height: 8),
             Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: [
                   Text(
-                    '${_formatCount((_videos[index]['comments'] as int))} comments',
+                    '${_formatCount(video['comments'] as int? ?? 0)} comments',
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   const Spacer(),
-                  IconButton(icon: const Icon(Icons.close, color: Colors.white54), onPressed: () => Navigator.pop(sheetContext)),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white54),
+                    onPressed: () => Navigator.pop(sheetContext),
+                  ),
                 ],
               ),
             ),
             const Divider(color: Colors.white12, height: 1),
             Expanded(
-              child: ListView.builder(
-                controller: scrollController,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                itemCount: comments.length,
-                itemBuilder: (_, i) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      CircleAvatar(
-                        radius: 16,
-                        backgroundColor: kNeonPurple.withValues(alpha: 0.3),
-                        child: Text(comments[i]['user']![0].toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 12)),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(comments[i]['user']!, style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 2),
-                            Text(comments[i]['text']!, style: const TextStyle(color: Colors.white, fontSize: 14)),
-                          ],
-                        ),
-                      ),
-                      const Icon(Icons.favorite_border, color: Colors.white30, size: 16),
-                    ],
-                  ),
-                ),
-              ),
+              child: reelId.isNotEmpty && !reelId.startsWith('template_')
+                  ? StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                      stream: ReelService.instance.getCommentsStream(reelId),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(child: CircularProgressIndicator(color: kNeonPurple));
+                        }
+                        final docs = snapshot.data?.docs ?? [];
+                        if (docs.isEmpty) {
+                          return const Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.chat_bubble_outline, color: Colors.white24, size: 48),
+                                SizedBox(height: 8),
+                                Text('No comments yet.', style: TextStyle(color: Colors.white54)),
+                                SizedBox(height: 4),
+                                Text('Be the first to share your thoughts.', style: TextStyle(color: Colors.white30, fontSize: 12)),
+                              ],
+                            ),
+                          );
+                        }
+                        return ListView.builder(
+                          controller: scrollController,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          itemCount: docs.length,
+                          itemBuilder: (_, i) {
+                            final cData = docs[i].data();
+                            final author = cData['authorName']?.toString() ?? 'NEX User';
+                            final text = cData['text']?.toString() ?? '';
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  CircleAvatar(
+                                    radius: 16,
+                                    backgroundColor: kNeonPurple.withValues(alpha: 0.3),
+                                    child: Text(
+                                      author.isNotEmpty ? author[0].toUpperCase() : 'U',
+                                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(author, style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                                        const SizedBox(height: 2),
+                                        Text(text, style: const TextStyle(color: Colors.white, fontSize: 14)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    )
+                  : _buildFallbackCommentsList(scrollController),
             ),
             const Divider(color: Colors.white12, height: 1),
             Padding(
@@ -366,12 +477,25 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
                   ),
                   IconButton(
                     icon: const Icon(Icons.send_rounded, color: kNeonBlue),
-                    onPressed: () {
+                    onPressed: () async {
                       final text = controller.text.trim();
-                      if (text.isNotEmpty) {
-                        setState(() => _videos[index]['comments'] = (_videos[index]['comments'] as int) + 1);
+                      if (text.isEmpty) return;
+                      controller.clear();
+                      setState(() {
+                        video['comments'] = ((video['comments'] as int?) ?? 0) + 1;
+                      });
+                      if (reelId.isNotEmpty && !reelId.startsWith('template_')) {
+                        final authorId = user?.uid ?? 'anon';
+                        final authorName = user?.displayName ?? user?.email?.split('@').first ?? 'NEX User';
+                        final authorPic = user?.photoURL ?? '';
+                        await ReelService.instance.addComment(
+                          reelId,
+                          text,
+                          authorId: authorId,
+                          authorName: authorName,
+                          authorPic: authorPic,
+                        );
                       }
-                      Navigator.pop(sheetContext);
                       scaffoldMessenger.showSnackBar(
                         const SnackBar(content: Text('Comment posted.')),
                       );
@@ -386,19 +510,57 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
     );
   }
 
+  Widget _buildFallbackCommentsList(ScrollController scrollController) {
+    const List<Map<String, String>> comments = [
+      {'user': 'nex_fan_01', 'text': 'This is incredible work!'},
+      {'user': 'flutter_dev', 'text': 'Super smooth flow. How long did this take?'},
+      {'user': 'cyber_ninja', 'text': 'The particle animations are top tier.'},
+    ];
+    return ListView.builder(
+      controller: scrollController,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      itemCount: comments.length,
+      itemBuilder: (_, i) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: kNeonPurple.withValues(alpha: 0.3),
+              child: Text(comments[i]['user']![0].toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 12)),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(comments[i]['user']!, style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 2),
+                  Text(comments[i]['text']!, style: const TextStyle(color: Colors.white, fontSize: 14)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _shareReel(int index) {
+    if (index >= _videos.length) return;
     final reel = _videos[index];
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Shared ${reel['title']} to your circle.')),
     );
-    setState(() => _videos[index]['shares'] = (_videos[index]['shares'] as int) + 1);
+    setState(() => _videos[index]['shares'] = ((_videos[index]['shares'] as int?) ?? 0) + 1);
   }
 
   void _showAIHelperSheet(BuildContext context) async {
     final navigator = Navigator.of(context);
     final status = await AIService.instance.getIntegrationStatus();
-    if (!mounted) return;
-    if (!context.mounted) return;
+    if (!mounted || !context.mounted) return;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: kSurfaceColor,
@@ -484,7 +646,7 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF070B14),
+      backgroundColor: Colors.black,
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -536,7 +698,7 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
       ),
       body: Stack(
         children: [
-          // Vertical TikTok/Instagram style PageView
+          // Vertical Full-Screen TikTok/Instagram style PageView
           PageView.builder(
             controller: _pageController,
             scrollDirection: Axis.vertical,
@@ -546,9 +708,9 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
               return _buildVideoCard(_videos[index], index);
             },
           ),
-          // Category chips at top
+          // Category chips at top below AppBar
           Positioned(
-            top: 90,
+            top: MediaQuery.of(context).padding.top + 56,
             left: 0,
             right: 0,
             child: SingleChildScrollView(
@@ -570,7 +732,7 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
                       ),
                       selected: isSelected,
                       selectedColor: kNeonPurple,
-                      backgroundColor: Colors.black45,
+                      backgroundColor: Colors.black54,
                       side: BorderSide(
                         color: isSelected ? kNeonPurple : Colors.white24,
                       ),
@@ -585,7 +747,7 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
               ),
             ),
           ),
-          // Floating heart particles
+          // Floating heart particles for double-tap
           ..._floatingHearts.map((h) => Positioned(
             left: h.x - 12,
             top: h.y - 12,
@@ -593,7 +755,7 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
               opacity: h.opacity.clamp(0.0, 1.0),
               child: Transform.scale(
                 scale: h.scale,
-                child: Icon(Icons.favorite, color: h.color, size: 24),
+                child: Icon(Icons.favorite, color: h.color, size: 28),
               ),
             ),
           )),
@@ -603,188 +765,226 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
   }
 
   Widget _buildVideoCard(Map<String, dynamic> video, int index) {
-    final accent = video['accent'] as Color;
+    final accent = (video['accent'] is Color) ? video['accent'] as Color : kNeonPurple;
+    final videoUrl = video['videoUrl']?.toString() ?? video['media_url']?.toString() ?? '';
+    final hasVideo = videoUrl.isNotEmpty;
+    final isCurrent = _currentPage == index;
     TapDownDetails? lastTapDown;
 
     return GestureDetector(
       onDoubleTapDown: (details) => lastTapDown = details,
       onDoubleTap: () => _onDoubleTap(index, lastTapDown),
       child: Stack(
+        fit: StackFit.expand,
         children: [
-          // Background gradient
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  const Color(0xFF070B14),
-                  accent.withValues(alpha: 0.25),
-                  kDarkBackground,
+          // 1. Full-size Video Background or Ambient Animated Particle Canvas
+          if (hasVideo)
+            _ReelVideoPlayer(
+              videoUrl: videoUrl,
+              isPlaying: isCurrent,
+              accent: accent,
+            )
+          else
+            _buildAmbientBackground(accent),
+
+          // 2. Top Vignette Gradient for clean header legibility
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 140,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.7),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // 3. Bottom Vignette Gradient for caption & buttons legibility
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 320,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.65),
+                    Colors.black.withValues(alpha: 0.95),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // 4. View Count Badge (Top-left, below categories)
+          Positioned(
+            left: 16,
+            top: MediaQuery.of(context).padding.top + 104,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.play_arrow_rounded, color: Colors.white70, size: 14),
+                  const SizedBox(width: 4),
+                  Text(
+                    _formatCount(video['views'] as int? ?? 0),
+                    style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(width: 3),
+                  const Text('views', style: TextStyle(color: Colors.white38, fontSize: 10)),
                 ],
               ),
             ),
           ),
-          // Animated particle background
-          AnimatedBuilder(
-            animation: _equalizerAnim,
-            builder: (context, _) {
-              return CustomPaint(
-                size: Size(MediaQuery.of(context).size.width, MediaQuery.of(context).size.height),
-                painter: _ReelsParticlePainter(
-                  progress: _equalizerAnim.value,
-                  accent: accent,
-                ),
-              );
-            },
-          ),
-          // Main content area
-          Positioned.fill(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 90, 16, 24),
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(30),
-                  gradient: LinearGradient(
-                    colors: [
-                      accent.withValues(alpha: 0.22),
-                      Colors.black.withValues(alpha: 0.28),
-                    ],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Creator info row
-                      Row(
+
+          // 5. Bottom Overlay: Creator info, caption, audio track
+          Positioned(
+            left: 16,
+            right: 80,
+            bottom: MediaQuery.of(context).padding.bottom + 20,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Creator row
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(colors: [accent, accent.withValues(alpha: 0.7)]),
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      child: Center(
+                        child: Text(
+                          (video['avatar']?.toString().isNotEmpty ?? false) ? video['avatar']![0].toUpperCase() : 'N',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            width: 52,
-                            height: 52,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: LinearGradient(colors: [accent, accent.withValues(alpha: 0.7)]),
-                              border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 2),
-                            ),
-                            child: Center(
-                              child: Text(
-                                video['avatar'],
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
-                              ),
-                            ),
+                          Text(
+                            '@${video['username'] ?? 'creator'}',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(video['username'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                                Text('${video['duration']} • ${video['mediaLabel']}', style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 13)),
-                              ],
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: () => _toggleFollow(index),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: video['followed'] ? Colors.white.withValues(alpha: 0.16) : kNeonPurple,
-                                borderRadius: BorderRadius.circular(999),
-                                border: Border.all(color: video['followed'] ? Colors.white24 : kNeonPurple),
-                              ),
-                              child: Text(
-                                video['followed'] ? 'Following' : 'Follow',
-                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
-                              ),
-                            ),
+                          Text(
+                            '${video['duration'] ?? '0:30'} • ${video['mediaLabel'] ?? 'Reel'}',
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 12),
                           ),
                         ],
                       ),
-                      const Spacer(),
-                      // Content card
-                      Container(
-                        padding: const EdgeInsets.all(16),
+                    ),
+                    GestureDetector(
+                      onTap: () => _toggleFollow(index),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.35),
+                          color: (video['followed'] == true) ? Colors.white.withValues(alpha: 0.2) : kNeonPurple,
                           borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: (video['followed'] == true) ? Colors.white30 : kNeonPurple),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(video['title'], style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 8),
-                            Text(
-                              video['description'],
-                              style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14, height: 1.4),
-                            ),
-                            const SizedBox(height: 10),
-                            Text(video['hashtags'], style: TextStyle(color: accent, fontWeight: FontWeight.w700)),
-                          ],
+                        child: Text(
+                          (video['followed'] == true) ? 'Following' : 'Follow',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12),
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      // Sound track bar with spinning disc
-                      _buildSoundTrackBar(video, accent),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ),
-            ),
-          ),
-          // View count & page indicator (top left)
-          Positioned(
-            left: 16,
-            right: 16,
-            top: 24,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.45),
-                    borderRadius: BorderRadius.circular(30),
+                const SizedBox(height: 10),
+                // Title & Caption
+                if ((video['title']?.toString().isNotEmpty ?? false))
+                  Text(
+                    video['title'].toString(),
+                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.play_arrow_rounded, color: Colors.white70, size: 16),
-                      const SizedBox(width: 4),
-                      Text(_formatCount(video['views'] as int? ?? 0), style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
-                      const SizedBox(width: 4),
-                      const Text('views', style: TextStyle(color: Colors.white38, fontSize: 10)),
-                    ],
+                if ((video['description']?.toString().isNotEmpty ?? false)) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    video['description'].toString(),
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13, height: 1.3),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.45),
-                    borderRadius: BorderRadius.circular(30),
+                ],
+                const SizedBox(height: 6),
+                // Hashtags
+                if ((video['hashtags']?.toString().isNotEmpty ?? false))
+                  Text(
+                    video['hashtags'].toString(),
+                    style: TextStyle(color: accent, fontWeight: FontWeight.w700, fontSize: 13),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  child: Text('${_currentPage + 1}/${_videos.length}', style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
-                ),
+                const SizedBox(height: 10),
+                // Sound track bar with mini equalizer
+                _buildSoundTrackBar(video, accent),
               ],
             ),
           ),
-          // Right side interaction buttons
+
+          // 6. Right Side Action Bar (Likes, comments, shares, save, vinyl disc)
           Positioned(
-            right: 18,
-            bottom: 120,
+            right: 14,
+            bottom: MediaQuery.of(context).padding.bottom + 20,
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                _buildReelSideButton(icon: video['liked'] ? Icons.favorite : Icons.favorite_border, label: _formatCount(video['likes']), color: video['liked'] ? Colors.redAccent : Colors.white, onTap: () => _toggleLike(index)),
-                const SizedBox(height: 16),
-                _buildReelSideButton(icon: Icons.chat_bubble_outline, label: _formatCount(video['comments']), color: Colors.white, onTap: () => _showCommentSheet(index)),
-                const SizedBox(height: 16),
-                _buildReelSideButton(icon: Icons.share_outlined, label: _formatCount(video['shares']), color: Colors.white, onTap: () => _shareReel(index)),
-                const SizedBox(height: 16),
-                _buildReelSideButton(icon: video['saved'] ? Icons.bookmark : Icons.bookmark_border, label: 'Save', color: video['saved'] ? kNeonGreen : Colors.white, onTap: () => _toggleSave(index)),
-                const SizedBox(height: 16),
+                _buildReelSideButton(
+                  icon: (video['liked'] == true) ? Icons.favorite : Icons.favorite_border,
+                  label: _formatCount(video['likes'] as int? ?? 0),
+                  color: (video['liked'] == true) ? Colors.redAccent : Colors.white,
+                  onTap: () => _toggleLike(index),
+                ),
+                const SizedBox(height: 14),
+                _buildReelSideButton(
+                  icon: Icons.chat_bubble_outline,
+                  label: _formatCount(video['comments'] as int? ?? 0),
+                  color: Colors.white,
+                  onTap: () => _showCommentSheet(index),
+                ),
+                const SizedBox(height: 14),
+                _buildReelSideButton(
+                  icon: Icons.share_outlined,
+                  label: _formatCount(video['shares'] as int? ?? 0),
+                  color: Colors.white,
+                  onTap: () => _shareReel(index),
+                ),
+                const SizedBox(height: 14),
+                _buildReelSideButton(
+                  icon: (video['saved'] == true) ? Icons.bookmark : Icons.bookmark_border,
+                  label: 'Save',
+                  color: (video['saved'] == true) ? kNeonGreen : Colors.white,
+                  onTap: () => _toggleSave(index),
+                ),
+                const SizedBox(height: 14),
                 // Spinning vinyl disc
                 AnimatedBuilder(
                   animation: _discAnim,
@@ -792,17 +992,17 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
                     return Transform.rotate(
                       angle: _discAnim.value * 2 * math.pi,
                       child: Container(
-                        width: 48,
-                        height: 48,
+                        width: 44,
+                        height: 44,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           gradient: SweepGradient(
                             colors: [accent, Colors.black, accent.withValues(alpha: 0.7), Colors.black, accent],
                           ),
-                          border: Border.all(color: Colors.white24, width: 2),
+                          border: Border.all(color: Colors.white30, width: 2),
                         ),
                         child: const Center(
-                          child: CircleAvatar(radius: 8, backgroundColor: Colors.white),
+                          child: CircleAvatar(radius: 6, backgroundColor: Colors.white),
                         ),
                       ),
                     );
@@ -816,21 +1016,55 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
     );
   }
 
+  Widget _buildAmbientBackground(Color accent) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                const Color(0xFF070B14),
+                accent.withValues(alpha: 0.28),
+                kDarkBackground,
+              ],
+            ),
+          ),
+        ),
+        AnimatedBuilder(
+          animation: _equalizerAnim,
+          builder: (context, _) {
+            return CustomPaint(
+              size: Size.infinite,
+              painter: _ReelsParticlePainter(
+                progress: _equalizerAnim.value,
+                accent: accent,
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
   Widget _buildSoundTrackBar(Map<String, dynamic> video, Color accent) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(30),
+        color: Colors.black.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: accent.withValues(alpha: 0.3)),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.music_note_rounded, color: accent, size: 16),
-          const SizedBox(width: 8),
-          Expanded(
+          Icon(Icons.music_note_rounded, color: accent, size: 15),
+          const SizedBox(width: 6),
+          Flexible(
             child: Text(
-              video['soundTrack'],
+              video['soundTrack']?.toString() ?? 'Original Audio',
               style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
               overflow: TextOverflow.ellipsis,
             ),
@@ -841,10 +1075,11 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
             animation: _equalizerAnim,
             builder: (_, __) {
               return Row(
+                mainAxisSize: MainAxisSize.min,
                 children: List.generate(4, (i) {
-                  final h = 8.0 + (_equalizerAnim.value * (i % 2 == 0 ? 10 : 6));
+                  final h = 7.0 + (_equalizerAnim.value * (i % 2 == 0 ? 9 : 5));
                   return Container(
-                    width: 3,
+                    width: 2.5,
                     height: h,
                     margin: const EdgeInsets.symmetric(horizontal: 1),
                     decoration: BoxDecoration(
@@ -867,12 +1102,12 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
       child: Column(
         children: [
           Container(
-            width: 52,
-            height: 52,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.black.withValues(alpha: 0.4),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+              color: Colors.black.withValues(alpha: 0.45),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
             ),
             child: Icon(icon, color: color, size: 24),
           ),
@@ -890,6 +1125,149 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
       return '${(count / 1000).toStringAsFixed(1)}K';
     }
     return count.toString();
+  }
+}
+
+class _ReelVideoPlayer extends StatefulWidget {
+  final String videoUrl;
+  final bool isPlaying;
+  final Color accent;
+
+  const _ReelVideoPlayer({
+    required this.videoUrl,
+    required this.isPlaying,
+    required this.accent,
+  });
+
+  @override
+  State<_ReelVideoPlayer> createState() => _ReelVideoPlayerState();
+}
+
+class _ReelVideoPlayerState extends State<_ReelVideoPlayer> {
+  VideoPlayerController? _controller;
+  bool _isInitialized = false;
+  bool _hasError = false;
+  bool _userPaused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initPlayer();
+  }
+
+  Future<void> _initPlayer() async {
+    if (widget.videoUrl.isEmpty) return;
+    try {
+      if (widget.videoUrl.startsWith('http://') || widget.videoUrl.startsWith('https://')) {
+        _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl));
+      } else {
+        _controller = VideoPlayerController.file(File(widget.videoUrl));
+      }
+      await _controller!.initialize();
+      _controller!.setLooping(true);
+      if (mounted) {
+        setState(() {
+          _isInitialized = true;
+        });
+        if (widget.isPlaying && !_userPaused) {
+          _controller!.play();
+        }
+      }
+    } catch (e) {
+      debugPrint('[ReelVideoPlayer] Video load notice: $e');
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+        });
+      }
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _ReelVideoPlayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.videoUrl != widget.videoUrl) {
+      _controller?.dispose();
+      _controller = null;
+      _isInitialized = false;
+      _hasError = false;
+      _initPlayer();
+    } else if (oldWidget.isPlaying != widget.isPlaying && _controller != null && _isInitialized) {
+      if (widget.isPlaying && !_userPaused) {
+        _controller!.play();
+      } else {
+        _controller!.pause();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  void _togglePlay() {
+    if (_controller == null || !_isInitialized) return;
+    setState(() {
+      if (_controller!.value.isPlaying) {
+        _controller!.pause();
+        _userPaused = true;
+      } else {
+        _controller!.play();
+        _userPaused = false;
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_hasError || !_isInitialized || _controller == null) {
+      return Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              const Color(0xFF070B14),
+              widget.accent.withValues(alpha: 0.35),
+              kDarkBackground,
+            ],
+          ),
+        ),
+        child: const Center(
+          child: CircularProgressIndicator(color: kNeonPurple, strokeWidth: 2),
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: _togglePlay,
+      behavior: HitTestBehavior.opaque,
+      child: Stack(
+        fit: StackFit.expand,
+        alignment: Alignment.center,
+        children: [
+          FittedBox(
+            fit: BoxFit.cover,
+            child: SizedBox(
+              width: _controller!.value.size.width,
+              height: _controller!.value.size.height,
+              child: VideoPlayer(_controller!),
+            ),
+          ),
+          if (!_controller!.value.isPlaying)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.5),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 48),
+            ),
+        ],
+      ),
+    );
   }
 }
 

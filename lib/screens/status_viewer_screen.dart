@@ -402,7 +402,7 @@ class _StatusViewerScreenState extends State<StatusViewerScreen> {
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Row(
                       children: [
-                        Icon(Icons.visibility, color: kNeonBlue, size: 16),
+                        const Icon(Icons.visibility, color: kNeonBlue, size: 16),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -474,10 +474,7 @@ class _StatusViewerScreenState extends State<StatusViewerScreen> {
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Row(
                       children: [
-                        Text(
-                          reaction['reaction']?.toString() ?? '💬',
-                          style: const TextStyle(fontSize: 18),
-                        ),
+                        const Icon(Icons.favorite_rounded, color: Colors.pinkAccent, size: 18),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(

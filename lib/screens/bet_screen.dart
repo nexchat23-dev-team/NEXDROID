@@ -320,7 +320,7 @@ class _BettingScreenState extends State<BettingScreen> with TickerProviderStateM
           children: [
             const Icon(Icons.rocket_launch, color: Colors.white, size: 20),
             const SizedBox(width: 8),
-            Text('Cashed Out at ${winMultiplier.toStringAsFixed(2)}x! Won $payout Tokens! 🚀'),
+            Text('Cashed Out at ${winMultiplier.toStringAsFixed(2)}x! Won $payout Tokens!'),
           ],
         ),
         backgroundColor: kNeonGreen,
@@ -387,7 +387,7 @@ class _BettingScreenState extends State<BettingScreen> with TickerProviderStateM
       );
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('💥 BOOM! You hit a mine. Lost stake.'),
+          content: Text('BOOM! You hit a mine. Lost stake.'),
           backgroundColor: Colors.redAccent,
           behavior: SnackBarBehavior.floating,
         ),
@@ -431,7 +431,7 @@ class _BettingScreenState extends State<BettingScreen> with TickerProviderStateM
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('💎 Cashed Out at ${_currentMinesMultiplier.toStringAsFixed(2)}x! Won $payout Tokens!'),
+        content: Text('Cashed Out at ${_currentMinesMultiplier.toStringAsFixed(2)}x! Won $payout Tokens!'),
         backgroundColor: kNeonGreen,
         behavior: SnackBarBehavior.floating,
       ),
@@ -487,7 +487,7 @@ class _BettingScreenState extends State<BettingScreen> with TickerProviderStateM
       setState(() {
         _wheelSpinning = false;
         _wheelResultText = mult > 0
-            ? 'Landed on ${sector['label']}! Won $payout Tokens 🎉'
+            ? 'Landed on ${sector['label']}! Won $payout Tokens!'
             : 'Landed on 0X. Better luck next spin!';
       });
 
@@ -556,7 +556,7 @@ class _BettingScreenState extends State<BettingScreen> with TickerProviderStateM
           _diceRolling = false;
           _diceLastRoll = finalRoll;
           _diceResultText = won
-              ? 'Rolled $finalRoll! WON $payout Tokens (${mult}x) 🎲'
+              ? 'Rolled $finalRoll! WON $payout Tokens (${mult}x)!'
               : 'Rolled $finalRoll. Lost $stake Tokens.';
         });
 
@@ -638,7 +638,7 @@ class _BettingScreenState extends State<BettingScreen> with TickerProviderStateM
         SnackBar(
           content: Text(
             won
-                ? 'Outcome: ${outcomeColor.toUpperCase()}! You won $payout Tokens! 🎰'
+                ? 'Outcome: ${outcomeColor.toUpperCase()}! You won $payout Tokens!'
                 : 'Outcome: ${outcomeColor.toUpperCase()}. Bet lost.',
           ),
           backgroundColor: won ? kNeonGreen : Colors.redAccent,

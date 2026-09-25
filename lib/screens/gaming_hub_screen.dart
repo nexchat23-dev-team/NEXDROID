@@ -146,7 +146,7 @@ class _GamingHubScreenState extends State<GamingHubScreen> with SingleTickerProv
         setState(() => _onlineFeaturesUnlocked = true);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('🔓 ONLINE MULTIPLAYER UNLOCKED! Welcome to the arena.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+            content: Text('ONLINE MULTIPLAYER UNLOCKED! Welcome to the arena.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
             backgroundColor: Color(0xFF00C853),
             behavior: SnackBarBehavior.floating,
             duration: Duration(seconds: 3),
@@ -284,7 +284,7 @@ class _GamingHubScreenState extends State<GamingHubScreen> with SingleTickerProv
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
                     child: Text(
-                      tokenProvider.balance >= kOnlineUnlockCost ? '🔓 UNLOCK NOW' : 'BUY TOKENS TO UNLOCK',
+                      tokenProvider.balance >= kOnlineUnlockCost ? 'UNLOCK NOW' : 'BUY TOKENS TO UNLOCK',
                       style: const TextStyle(
                         fontWeight: FontWeight.w900,
                         fontSize: 12,
@@ -1024,9 +1024,9 @@ class _GamingHubScreenState extends State<GamingHubScreen> with SingleTickerProv
                           child: Column(children: [
                             Text('$m ${m == 1 ? 'mo' : 'mos'}', style: TextStyle(color: isSelected ? Colors.white : Colors.white70, fontWeight: FontWeight.w900, fontSize: 12)),
                             Text('$c T', style: TextStyle(color: isSelected ? kNeonGreen : Colors.white38, fontSize: 10, fontWeight: FontWeight.bold)),
-                            if (m >= 12) const Text('🏆 BEST', style: TextStyle(color: Colors.amber, fontSize: 8, fontWeight: FontWeight.bold)),
-                            if (m >= 6 && m < 12) const Text('🔥 SAVE 35%', style: TextStyle(color: kNeonGreen, fontSize: 8, fontWeight: FontWeight.bold)),
-                            if (m >= 3 && m < 6) const Text('✨ SAVE 22%', style: TextStyle(color: kNeonBlue, fontSize: 8, fontWeight: FontWeight.bold)),
+                            if (m >= 12) const Text('BEST', style: TextStyle(color: Colors.amber, fontSize: 8, fontWeight: FontWeight.bold)),
+                            if (m >= 6 && m < 12) const Text('SAVE 35%', style: TextStyle(color: kNeonGreen, fontSize: 8, fontWeight: FontWeight.bold)),
+                            if (m >= 3 && m < 6) const Text('SAVE 22%', style: TextStyle(color: kNeonBlue, fontSize: 8, fontWeight: FontWeight.bold)),
                           ]),
                         ),
                       );
@@ -1068,7 +1068,7 @@ class _GamingHubScreenState extends State<GamingHubScreen> with SingleTickerProv
                           await _saveSubscription(gameName, selectedMonths);
                           if (!ctx.mounted || !mounted) return;
                           Navigator.pop(ctx);
-                          _showSystemSnackBar(context, '$gameName — $selectedMonths month sub activated! 🎮');
+                          _showSystemSnackBar(context, '$gameName — $selectedMonths month sub activated!');
                           onSuccess();
                         } else {
                           Navigator.pop(ctx);

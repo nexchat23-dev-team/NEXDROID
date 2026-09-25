@@ -59,10 +59,10 @@ Widget buildArenaStartPrompt({
       Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(
         color: accentColor.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(12),
         border: Border.all(color: accentColor.withValues(alpha: 0.2))),
-        child: Text('🎮 $controls', style: TextStyle(color: accentColor.withValues(alpha: 0.8), fontSize: 11, height: 1.5)),
+        child: Text(controls, style: TextStyle(color: accentColor.withValues(alpha: 0.8), fontSize: 11, height: 1.5)),
       ),
       const SizedBox(height: 14),
-      Text('🏆 HIGH SCORE: $highScore', style: TextStyle(color: _kGold, fontSize: 16, fontWeight: FontWeight.bold)),
+      Text('HIGH SCORE: $highScore', style: TextStyle(color: _kGold, fontSize: 16, fontWeight: FontWeight.bold)),
       const SizedBox(height: 16),
       if (extraInfo != null) ...[extraInfo, const SizedBox(height: 14)],
       ElevatedButton.icon(
@@ -114,7 +114,7 @@ Widget buildArenaGameOver({
       if (extra.isNotEmpty)
         Text(extra, style: const TextStyle(color: Colors.white70, fontSize: 15)),
       if (newRecord)
-        Padding(padding: const EdgeInsets.only(top: 8), child: Text('🏆 NEW HIGH SCORE!',
+        Padding(padding: const EdgeInsets.only(top: 8), child: Text('NEW HIGH SCORE!',
           style: TextStyle(color: _kGold, fontSize: 18, fontWeight: FontWeight.w900,
             shadows: [Shadow(color: _kGold, blurRadius: 15)]))),
       const SizedBox(height: 24),
@@ -449,9 +449,9 @@ class _NeonTankWarsGameState extends State<NeonTankWarsGame> with TickerProvider
             shadows: [Shadow(color: _kNeonY, blurRadius: 10)])),
           Text('SCORE: $_score', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
           Row(children: List.generate(_lives, (_) => const Icon(Icons.star_rounded, color: _kNeonY, size: 16))),
-          if (_rapidFire) Text('⚡ RAPID FIRE!', style: TextStyle(color: _kNeonY, fontSize: 13, fontWeight: FontWeight.bold,
+          if (_rapidFire) Text('RAPID FIRE!', style: TextStyle(color: _kNeonY, fontSize: 13, fontWeight: FontWeight.bold,
             shadows: [Shadow(color: _kNeonY, blurRadius: 8)])),
-          if (_speedBoost > 0) Text('💨 SPEED BOOST!', style: TextStyle(color: _kNeonG, fontSize: 13, fontWeight: FontWeight.bold)),
+          if (_speedBoost > 0) Text('SPEED BOOST!', style: TextStyle(color: _kNeonG, fontSize: 13, fontWeight: FontWeight.bold)),
         ])),
         Positioned(top: 44, right: 16, child: Row(children: [
           Icon(Icons.shield_outlined, color: _kNeonC, size: 16),
@@ -484,7 +484,7 @@ class _NeonTankWarsGameState extends State<NeonTankWarsGame> with TickerProvider
         story: 'Commander HAVOC controls the last functioning battle tank in Neo-Citadel. '
             'Cyber-Faction armored divisions have surrounded the city. '
             'Destroy every enemy tank before they breach the core!',
-        controls: 'Left stick: Drive tank • Right stick: Aim turret • Fire button: Shoot shells\nCollect power-ups (💊 health, ⚡ rapid fire, 💨 speed)',
+        controls: 'Left stick: Drive tank • Right stick: Aim turret • Fire button: Shoot shells\nCollect power-ups (Health, Rapid Fire, Speed)',
         accentColor: _kNeonY, secondColor: _kNeonO,
         highScore: _highScore, onPlay: _startGame,
       ),
@@ -933,7 +933,7 @@ class _BladeRunnerXGameState extends State<BladeRunnerXGame> with TickerProvider
           story: 'Agent VEYRA has gone rogue, sprinting through Neo-Tokyo\'s megastructure. '
               'Dodge laser barriers, slide under surveillance drones, and slash through security walls. '
               'The Megacorp bounty hunters are closing in — run or die!',
-          controls: 'TAP anywhere: Jump • Double-tap: Double jump • Swipe down: Slide\nSLASH button: Destroy walls • Collect 💾 data chips for bonus score',
+          controls: 'TAP anywhere: Jump • Double-tap: Double jump • Swipe down: Slide\nSLASH button: Destroy walls • Collect data chips for bonus score',
           accentColor: _kNeonM, secondColor: _kNeonC,
           highScore: _highScore, onPlay: _startGame,
         ),
@@ -1451,8 +1451,8 @@ class _AstroDogfightGameState extends State<AstroDogfightGame> with TickerProvid
           Text('WAVE $_wave', style: TextStyle(color: _kNeonY, fontSize: 22, fontWeight: FontWeight.w900,
             shadows: [Shadow(color: _kNeonY, blurRadius: 10)])),
           Text('SCORE: $_score', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-          Text('🚀 MISSILES: $_missiles', style: TextStyle(color: _kNeonR, fontSize: 14, fontWeight: FontWeight.bold)),
-          if (_shielded) Text('🛡 SHIELD ACTIVE', style: TextStyle(color: _kNeonC, fontSize: 13)),
+          Text('MISSILES: $_missiles', style: TextStyle(color: _kNeonR, fontSize: 14, fontWeight: FontWeight.bold)),
+          if (_shielded) Text('SHIELD ACTIVE', style: TextStyle(color: _kNeonC, fontSize: 13)),
         ])),
         Positioned(top: 44, right: 16, child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Row(children: [
@@ -2393,7 +2393,7 @@ class _DriftKingsGameState extends State<DriftKingsGame> with TickerProviderStat
   void _finishRace() {
     _raceOver = true;
     _position == 1 ? HapticFeedback.heavyImpact() : null;
-    _raceResult = _position == 1 ? '🏆 1ST PLACE! YOU WIN!' : '${_position}${_position == 2 ? 'ND' : 'RD'} PLACE';
+    _raceResult = _position == 1 ? '1ST PLACE! YOU WIN!' : '${_position}${_position == 2 ? 'ND' : 'RD'} PLACE';
     _score += (_totalLaps * 500 ~/ _position);
     if (_bestLapTime < 999) _score += (1000 ~/ _bestLapTime.toInt()).clamp(0, 500);
     _saveHS();
@@ -2419,10 +2419,10 @@ class _DriftKingsGameState extends State<DriftKingsGame> with TickerProviderStat
         Positioned(top: 44, left: 16, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('LAP ${min(_lap + 1, _totalLaps)}/$_totalLaps', style: TextStyle(color: _kNeonO, fontSize: 22, fontWeight: FontWeight.w900,
             shadows: [Shadow(color: _kNeonO, blurRadius: 10)])),
-          Text('POSITION: ${_position == 1 ? '1ST 🥇' : _position == 2 ? '2ND 🥈' : '${_position}TH'}',
+          Text('POSITION: ${_position == 1 ? '1ST' : _position == 2 ? '2ND' : '${_position}TH'}',
             style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
           Text('SCORE: $_score', style: TextStyle(color: _kNeonY, fontSize: 14, fontWeight: FontWeight.bold)),
-          if (_driftPoints > 5) Text('🔥 DRIFTING! x${_driftMult.toStringAsFixed(1)}',
+          if (_driftPoints > 5) Text('DRIFTING! x${_driftMult.toStringAsFixed(1)}',
             style: TextStyle(color: _kNeonO, fontSize: 14, fontWeight: FontWeight.bold,
               shadows: [Shadow(color: _kNeonO, blurRadius: 8)])),
         ])),

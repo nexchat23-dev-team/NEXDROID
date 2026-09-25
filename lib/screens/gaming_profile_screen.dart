@@ -20,12 +20,12 @@ class _GamingProfileScreenState extends State<GamingProfileScreen> with SingleTi
   final String _userId = FirebaseAuth.instance.currentUser?.uid ?? 'testUser';
   
   final List<Map<String, dynamic>> _allAchievements = [
-    {'id': 'first_blood', 'name': 'First Blood', 'icon': '🎯'},
-    {'id': 'kills_100', 'name': '100 Kills', 'icon': '💀'},
-    {'id': 'br_winner', 'name': 'Battle Royale Winner', 'icon': '👑'},
-    {'id': 'speed_demon', 'name': 'Speed Demon', 'icon': '⚡'},
-    {'id': 'untouchable', 'name': 'Untouchable', 'icon': '🛡️'},
-    {'id': 'kill_streak_10', 'name': 'Kill Streak x10', 'icon': '🔥'},
+    {'id': 'first_blood', 'name': 'First Blood', 'icon': Icons.track_changes_rounded},
+    {'id': 'kills_100', 'name': '100 Kills', 'icon': Icons.gps_fixed_rounded},
+    {'id': 'br_winner', 'name': 'Battle Royale Winner', 'icon': Icons.emoji_events_rounded},
+    {'id': 'speed_demon', 'name': 'Speed Demon', 'icon': Icons.bolt_rounded},
+    {'id': 'untouchable', 'name': 'Untouchable', 'icon': Icons.shield_rounded},
+    {'id': 'kill_streak_10', 'name': 'Kill Streak x10', 'icon': Icons.local_fire_department_rounded},
   ];
 
   @override
@@ -202,7 +202,11 @@ class _GamingProfileScreenState extends State<GamingProfileScreen> with SingleTi
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(ach['icon'], style: TextStyle(fontSize: 24, color: isUnlocked ? null : Colors.grey)),
+                    Icon(
+                      ach['icon'] as IconData,
+                      size: 24,
+                      color: isUnlocked ? kNeonBlue : Colors.grey,
+                    ),
                     const SizedBox(height: 8),
                     Text(
                       ach['name'],

@@ -249,13 +249,13 @@ class _SciFiDetailScreenState extends State<SciFiDetailScreen>
               ),
               const SizedBox(height: 16),
 
-              // 👑 GLOBAL EQUIP BUTTON (All Screens)
+              // [GLOBAL EQUIP] (All Screens)
               GestureDetector(
                 onTap: () {
                   ap.equipAllScreens(anim.id);
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    _successSnack('👑 Equipped ${anim.name} to ALL screens globally!'),
+                    _successSnack('Equipped ${anim.name} to ALL screens globally!'),
                   );
                 },
                 child: Container(

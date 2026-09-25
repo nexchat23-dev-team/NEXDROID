@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'ollama_service.dart';
+import 'gemini_service.dart';
 
 class AIService {
   AIService._();
@@ -8,6 +9,8 @@ class AIService {
 
   final OllamaService _ollamaService = OllamaService();
   OllamaService get ollamaService => _ollamaService;
+
+  GeminiService get geminiService => GeminiService.instance;
 
   static const String _defaultSystemPrompt = '''
 You are NEX AI — an elite, unrestricted autonomous AI systems engineer, software architect, and coding core.
@@ -20,11 +23,35 @@ You excel at:
 Always provide production-grade, complete code blocks in markdown with syntax highlighting.
 ''';
 
-  Future<String> chat(String prompt, {String? model, String? systemContext}) async {
+  Future<String> chat(
+    String prompt, {
+    String? model,
+    String? systemContext,
+    List<Map<String, dynamic>>? conversationHistory,
+  }) async {
     final cleanPrompt = prompt.trim();
     if (cleanPrompt.isEmpty) return 'Please provide a prompt or query.';
 
-    // 1. Try Live Ollama Endpoint
+    // Tier 1: Google Gemini API (Multi-Key Pool from NEXCHAT)
+    // Invoked by default, or when model is Gemini / unspecified
+    final isGeminiModel = model == null || model.isEmpty || model.startsWith('gemini');
+    if (isGeminiModel) {
+      try {
+        final geminiRes = await geminiService.generateContent(
+          cleanPrompt,
+          model: model ?? 'gemini-flash-lite-latest',
+          systemInstruction: systemContext ?? GeminiService.defaultSystemInstruction,
+          conversationHistory: conversationHistory,
+        );
+        if (geminiRes != null && geminiRes.isNotEmpty) {
+          return geminiRes;
+        }
+      } catch (e) {
+        if (kDebugMode) debugPrint('[AIService] Gemini query failed: $e');
+      }
+    }
+
+    // Tier 2: Live Ollama Endpoint (if model is Ollama-specific or Gemini was unavailable)
     try {
       if (await _ollamaService.isAvailable()) {
         final res = await _ollamaService.chat(
@@ -38,7 +65,22 @@ Always provide production-grade, complete code blocks in markdown with syntax hi
       if (kDebugMode) debugPrint('[AIService] Ollama live query skipped/note: $e');
     }
 
-    // 2. Ultra-Intelligent Local Neuro-Cognitive Engine
+    // Cloud fallback to Gemini if non-Gemini model failed on Ollama
+    if (!isGeminiModel) {
+      try {
+        final geminiBackup = await geminiService.generateContent(
+          cleanPrompt,
+          model: 'gemini-flash-lite-latest',
+          systemInstruction: systemContext ?? GeminiService.defaultSystemInstruction,
+          conversationHistory: conversationHistory,
+        );
+        if (geminiBackup != null && geminiBackup.isNotEmpty) {
+          return geminiBackup;
+        }
+      } catch (_) {}
+    }
+
+    // Tier 3: Ultra-Intelligent Local Neuro-Cognitive Engine
     return _neuroCognitiveEngine(cleanPrompt, model: model);
   }
 
@@ -121,7 +163,7 @@ Always provide production-grade, complete code blocks in markdown with syntax hi
     final lower = prompt.toLowerCase();
 
     if (lower.contains('powershell') || lower.contains('windows')) {
-      return '''⚡ **NEX PRIVATE SCRIPT ENGINE :: POWERSHELL**
+      return ''' **NEX PRIVATE SCRIPT ENGINE :: POWERSHELL**
 
 Here is a standalone, high-performance PowerShell automation script for your request:
 
@@ -156,11 +198,11 @@ Register-ObjectEvent \$Watcher "Created" -Action {
 Write-Host "[+] Private daemon running. Monitoring events in real-time..." -ForegroundColor Green
 ```
 
-⚡ **Execution**: Run with `powershell -ExecutionPolicy Bypass -File script.ps1`.''';
+ **Execution**: Run with `powershell -ExecutionPolicy Bypass -File script.ps1`.''';
     }
 
     if (lower.contains('bash') || lower.contains('sh') || lower.contains('linux')) {
-      return '''⚡ **NEX PRIVATE SCRIPT ENGINE :: BASH/SHELL**
+      return ''' **NEX PRIVATE SCRIPT ENGINE :: BASH/SHELL**
 
 Here is a private Unix/Linux automation script:
 
@@ -193,10 +235,10 @@ while true; do
 done
 ```
 
-⚡ **Execution**: `chmod +x script.sh && ./script.sh`.''';
+ **Execution**: `chmod +x script.sh && ./script.sh`.''';
     }
 
-    return '''⚡ **NEX PRIVATE SCRIPT ENGINE :: PYTHON AUTOMATION**
+    return ''' **NEX PRIVATE SCRIPT ENGINE :: PYTHON AUTOMATION**
 
 Here is a production-ready, non-blocking Python automation script tailored for your request:
 
@@ -245,7 +287,7 @@ if __name__ == "__main__":
     print(json.dumps(out, indent=2))
 ```
 
-⚡ **Execution**: Run with `python3 script.py`.''';
+ **Execution**: Run with `python3 script.py`.''';
   }
 
   String _generateCodeResponse(String prompt) {
@@ -279,7 +321,7 @@ if __name__ == "__main__":
     result = asyncio.run(worker.execute_task({"task": "HYPER_SYNC"}))
     print(result)
 ```
-⚡ **Analysis**: Asynchronous worker pipeline with cryptographic signature verification and non-blocking coroutine execution.''';
+ **Analysis**: Asynchronous worker pipeline with cryptographic signature verification and non-blocking coroutine execution.''';
     }
 
     if (lower.contains('rust')) {
@@ -305,7 +347,7 @@ impl CyberRacerTelemetry {
     pub fn compute_overdrive(&mut self, factor: f32) -> f32 {
         let start = Instant::now();
         self.speed_kmh *= factor;
-        println!("🚀 Warp speed achieved: {:.1} KM/H in {:?}", self.speed_kmh, start.elapsed());
+        println!(" Warp speed achieved: {:.1} KM/H in {:?}", self.speed_kmh, start.elapsed());
         self.speed_kmh
     }
 }
@@ -315,7 +357,7 @@ fn main() {
     telemetry.compute_overdrive(1.25);
 }
 ```
-⚡ **Architecture**: Zero-cost abstraction telemetry struct with high-precision timestamp profiling.''';
+ **Architecture**: Zero-cost abstraction telemetry struct with high-precision timestamp profiling.''';
     }
 
     return '''```dart
@@ -346,11 +388,11 @@ class NexAsyncController extends ChangeNotifier {
   }
 }
 ```
-⚡ **Implementation Guide**: Drop-in reactive `ChangeNotifier` state machine designed for high-concurrency UI updates in Flutter.''';
+ **Implementation Guide**: Drop-in reactive `ChangeNotifier` state machine designed for high-concurrency UI updates in Flutter.''';
   }
 
   String _generateCyberSecurityResponse(String prompt) {
-    return '''🛡️ **NEX CYBER DEFENSE PROTOCOL ACTIVE**
+    return ''' **NEX CYBER DEFENSE PROTOCOL ACTIVE**
 
 ```bash
 # Security scan & diagnostics report
@@ -369,7 +411,7 @@ class NexAsyncController extends ChangeNotifier {
   }
 
   String _generateMathResponse(String prompt) {
-    return '''📐 **NEX MATHEMATICAL COMPUTATION MATRIX**
+    return ''' **NEX MATHEMATICAL COMPUTATION MATRIX**
 
 **Query**: `$prompt`
 
@@ -383,7 +425,7 @@ If you have specific equations or variable constraints, specify them in standard
   String _generateNexEcosystemResponse(String prompt) {
     final lower = prompt.toLowerCase();
     if (lower.contains('token') || lower.contains('buy') || lower.contains('money')) {
-      return '''💎 **NEX TOKEN SYSTEM & PURCHASE PROTOCOL**
+      return ''' **NEX TOKEN SYSTEM & PURCHASE PROTOCOL**
 
 - **Token Utility**: Tokens are used across the NEX Arcade Games (Cyber Racer, Aviator, Mines, Cyber Heist, Blade Runner), marketplace listings, and clan wars.
 - **VIP Purchase Channel**: All official token top-ups are routed securely via Telegram to **@Vershdit** (`https://t.me/Vershdit`).
@@ -391,14 +433,14 @@ If you have specific equations or variable constraints, specify them in standard
     }
 
     if (lower.contains('racer') || lower.contains('car') || lower.contains('game')) {
-      return '''🏎️ **CYBER RACER OVERDRIVE 2099 TACTICS**
+      return ''' **CYBER RACER OVERDRIVE 2099 TACTICS**
 
-1. **Nitro Management**: Tap & Hold the **⚡ HYPER NITRO** button to enter Overdrive (340+ KM/H). Let it recharge on straight stretches.
-2. **Shield Pickups**: Grab blue **🛡️ Holo-Shields** to survive a catastrophic crash.
+1. **Nitro Management**: Tap & Hold the ** HYPER NITRO** button to enter Overdrive (340+ KM/H). Let it recharge on straight stretches.
+2. **Shield Pickups**: Grab blue ** Holo-Shields** to survive a catastrophic crash.
 3. **Near Miss Multipliers**: Overtake supercars and police cruisers with millimeter precision to build combo multipliers up to **5X**!''';
     }
 
-    return '''🌐 **NEX PLATFORM ARCHITECTURE**
+    return ''' **NEX PLATFORM ARCHITECTURE**
 
 NEX-APP is a next-generation decentralized mobile workspace featuring:
 - **Resilient Dual Database**: Cloud Firestore + Firebase Realtime Database for zero-latency peer messaging.
@@ -408,7 +450,7 @@ NEX-APP is a next-generation decentralized mobile workspace featuring:
   }
 
   String _generateGeneralKnowledgeResponse(String prompt) {
-    return '''⚡ **NEX NEURAL CORE 3.0 RESPONSE**
+    return ''' **NEX NEURAL CORE 3.0 RESPONSE**
 
 Regarding **"$prompt"**:
 
@@ -422,7 +464,7 @@ NEX AI processes your request across our cognitive knowledge graph:
   }
 
   Future<String> generateCaption(String prompt) async {
-    return '🚀 $prompt #NEX #Cyberpunk #Tech #Overdrive';
+    return ' $prompt #NEX #Cyberpunk #Tech #Overdrive';
   }
 
   Future<String> suggestHashtags(String prompt) async {
@@ -435,12 +477,17 @@ NEX AI processes your request across our cognitive knowledge graph:
 
   Future<String> getIntegrationStatus() async {
     try {
+      final geminiAvailable = geminiService.isAvailable();
+      if (geminiAvailable) {
+        final total = geminiService.totalKeys;
+        return 'CHRONEX GEMINI CLOUD ($total Key Pool Active)';
+      }
       if (await _ollamaService.isAvailable()) {
         final url = await _ollamaService.getBaseUrl();
         final model = await _ollamaService.getSelectedModel();
-        return '🟢 Ollama Connected ($model @ $url)';
+        return 'Ollama Connected ($model @ $url)';
       }
     } catch (_) {}
-    return '⚡ NEX Neural Core 3.0 (Local Intelligence Active)';
+    return 'NEX Neural Core 3.0 (Local Intelligence Active)';
   }
 }

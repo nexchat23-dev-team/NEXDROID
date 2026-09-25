@@ -171,15 +171,15 @@ class MediaDownloaderService extends ChangeNotifier {
   static String getPlatformEmoji(MediaPlatform platform) {
     switch (platform) {
       case MediaPlatform.youtube:
-        return '▶️';
+        return 'YT';
       case MediaPlatform.tiktok:
-        return '🎵';
+        return 'TT';
       case MediaPlatform.instagram:
-        return '📸';
+        return 'IG';
       case MediaPlatform.twitter:
-        return '🐦';
+        return 'X';
       case MediaPlatform.unknown:
-        return '🌐';
+        return 'WEB';
     }
   }
 

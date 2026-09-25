@@ -2402,7 +2402,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                             const Icon(Icons.auto_awesome_rounded, color: Color(0xFFB44FFF)),
                             const SizedBox(width: 8),
                             Text(
-                              '🌌 REALITY WARPED: +10,000 XP! (${leveling.anomalousPower})',
+                              'REALITY WARPED: +10,000 XP! (${leveling.anomalousPower})',
                               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
                             ),
                           ],
@@ -2474,7 +2474,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                         Icon(Icons.military_tech_rounded, color: Color(0xFFFFD700), size: 15),
                         SizedBox(width: 5),
                         Text(
-                          'ASCEND PRESTIGE 🔱',
+                          'ASCEND PRESTIGE',
                           style: TextStyle(
                             color: Color(0xFFFFD700),
                             fontWeight: FontWeight.w900,
@@ -2643,7 +2643,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                             padding: const EdgeInsets.symmetric(vertical: 12),
                           ),
-                          child: const Text('ASCEND 🔱', style: TextStyle(fontWeight: FontWeight.w900)),
+                          child: const Text('ASCEND', style: TextStyle(fontWeight: FontWeight.w900)),
                         ),
                       ),
                     ],
@@ -2963,7 +2963,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             description: 'Play 2 games in Gaming Hub',
             progress: 0.5,
             progressText: '1 / 2',
-            rewardText: '+350 XP • 1,000 🪙',
+            rewardText: '+350 XP • 1,000 TOKENS',
             isClaimed: false,
             isReadyToClaim: false,
             onClaim: null,
@@ -2977,7 +2977,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             description: 'Send 5 encrypted chat messages',
             progress: 1.0,
             progressText: '5 / 5',
-            rewardText: '+250 XP • 500 🪙',
+            rewardText: '+250 XP • 500 TOKENS',
             isClaimed: _claimedMission2,
             isReadyToClaim: !_claimedMission2,
             onClaim: () {
@@ -3011,7 +3011,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             description: 'Equip any sci-fi animation',
             progress: 1.0,
             progressText: '1 / 1',
-            rewardText: '+200 XP • 500 🪙',
+            rewardText: '+200 XP • 500 TOKENS',
             isClaimed: _claimedMission3,
             isReadyToClaim: false,
             onClaim: null,
@@ -3025,7 +3025,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             description: 'Maintain 7-day login streak',
             progress: 1.0,
             progressText: '7 / 7',
-            rewardText: '+500 XP • 2,000 🪙',
+            rewardText: '+500 XP • 2,000 TOKENS',
             isClaimed: _claimedMission4,
             isReadyToClaim: false,
             onClaim: null,
@@ -3431,11 +3431,11 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
 
           const SizedBox(height: 14),
 
-          _buildHoloSlot('🏠 Home Screen', getAnimName(ap.equippedHomeAnimation), Icons.home_rounded, const Color(0xFF00E5FF)),
-          _buildHoloSlot('🚀 Splash Screen', getAnimName(ap.equippedSplashAnimation), Icons.rocket_launch_rounded, const Color(0xFFFF5252)),
-          _buildHoloSlot('👤 Profile Screen', getAnimName(ap.equippedProfileAnimation), Icons.account_circle_rounded, const Color(0xFF00FF88)),
-          _buildHoloSlot('🎮 Gaming Hub', getAnimName(ap.equippedGamingHubAnimation), Icons.sports_esports_rounded, const Color(0xFFFFD700)),
-          _buildHoloSlot('🛍️ Animation Store', getAnimName(ap.equippedStoreAnimation), Icons.storefront_rounded, const Color(0xFFC084FC)),
+          _buildHoloSlot('Home Screen', getAnimName(ap.equippedHomeAnimation), Icons.home_rounded, const Color(0xFF00E5FF)),
+          _buildHoloSlot('Splash Screen', getAnimName(ap.equippedSplashAnimation), Icons.rocket_launch_rounded, const Color(0xFFFF5252)),
+          _buildHoloSlot('Profile Screen', getAnimName(ap.equippedProfileAnimation), Icons.account_circle_rounded, const Color(0xFF00FF88)),
+          _buildHoloSlot('Gaming Hub', getAnimName(ap.equippedGamingHubAnimation), Icons.sports_esports_rounded, const Color(0xFFFFD700)),
+          _buildHoloSlot('Animation Store', getAnimName(ap.equippedStoreAnimation), Icons.storefront_rounded, const Color(0xFFC084FC)),
         ],
       ),
     );
@@ -4094,11 +4094,11 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _buildStatusPresetChip("Available • Online ⚡"),
-                _buildStatusPresetChip("In Combat Match 🎮"),
-                _buildStatusPresetChip("Overclocking Code 💻"),
-                _buildStatusPresetChip("Stealth Protocol 👻"),
-                _buildStatusPresetChip("AFK in Hyperspace 🚀"),
+                _buildStatusPresetChip("Available • Online"),
+                _buildStatusPresetChip("In Combat Match"),
+                _buildStatusPresetChip("Overclocking Code"),
+                _buildStatusPresetChip("Stealth Protocol"),
+                _buildStatusPresetChip("AFK in Hyperspace"),
               ],
             ),
           ),
@@ -4235,7 +4235,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                   border: Border.all(color: const Color(0xFFFF9800).withValues(alpha: 0.5)),
                 ),
                 child: Text(
-                  '🔥 ${tokenProvider.streakCount} DAY STREAK',
+                  '${tokenProvider.streakCount} DAY STREAK',
                   style: const TextStyle(color: Color(0xFFFF9800), fontSize: 10, fontWeight: FontWeight.w900),
                 ),
               ),
@@ -4257,7 +4257,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                           tokenProvider.claimDailyBonus(2500);
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('🎉 Daily reward claimed: +2,500 Tokens!'),
+                              content: Text('Daily reward claimed: +2,500 Tokens!'),
                               backgroundColor: Color(0xFF00A884),
                             ),
                           );
@@ -4425,11 +4425,11 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             spacing: 8,
             runSpacing: 8,
             children: [
-              _buildTrophyChip('Combat Master 🏆', const Color(0xFFFF5252)),
-              _buildTrophyChip('Matrix Hacker 🟩', const Color(0xFF00FF88)),
-              _buildTrophyChip('Cyber Pioneer 🚀', const Color(0xFF00E5FF)),
-              _buildTrophyChip('Action Ace ⚡', const Color(0xFFFFD700)),
-              _buildTrophyChip('Void Sovereign 🌀', const Color(0xFFB44FFF)),
+              _buildTrophyChip('Combat Master', const Color(0xFFFF5252)),
+              _buildTrophyChip('Matrix Hacker', const Color(0xFF00FF88)),
+              _buildTrophyChip('Cyber Pioneer', const Color(0xFF00E5FF)),
+              _buildTrophyChip('Action Ace', const Color(0xFFFFD700)),
+              _buildTrophyChip('Void Sovereign', const Color(0xFFB44FFF)),
             ],
           ),
         ],

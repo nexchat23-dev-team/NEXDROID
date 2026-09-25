@@ -16,6 +16,7 @@ import 'battery_saver_screen.dart';
 import 'permission_screen.dart';
 import 'animation_store_screen.dart';
 import 'about_developers_screen.dart';
+import 'admin_dashboard_screen.dart';
 import '../providers/animation_provider.dart';
 import '../providers/locale_provider.dart';
 import '../providers/theme_provider.dart';
@@ -1091,6 +1092,12 @@ class _SettingsScreenState extends State<SettingsScreen>
                           Navigator.pushNamed(context, PermissionScreen.routeName),
                     ),
                     _buildSettingsTile(
+                      icon: Icons.admin_panel_settings_rounded,
+                      title: 'NEX Manager Console',
+                      subtitle: 'Master control center, live users, reels moderation & security',
+                      onTap: () => Navigator.pushNamed(context, AdminDashboardScreen.routeName),
+                    ),
+                    _buildSettingsTile(
                       icon: Icons.code_rounded,
                       title: 'About Developers & NEXO Team',
                       subtitle: 'Meet the architects, GitHub repos & official portal',
@@ -1957,11 +1964,11 @@ class _SettingsScreenState extends State<SettingsScreen>
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  _soundTestChip('⚡ Laser', const Color(0xFF00D4FF), () => GameSoundService().playLaser()),
-                  _soundTestChip('💎 Gem / Coin', Colors.amber, () => GameSoundService().playCoin()),
-                  _soundTestChip('🏆 Jackpot Win', const Color(0xFF00FF88), () => GameSoundService().playWin()),
-                  _soundTestChip('💥 Explosion', const Color(0xFFFF3366), () => GameSoundService().playExplosion()),
-                  _soundTestChip('🎯 Sniper Shot', Colors.purpleAccent, () => GameSoundService().playSniper()),
+                  _soundTestChip('Laser', const Color(0xFF00D4FF), () => GameSoundService().playLaser()),
+                  _soundTestChip('Gem / Coin', Colors.amber, () => GameSoundService().playCoin()),
+                  _soundTestChip('Jackpot Win', const Color(0xFF00FF88), () => GameSoundService().playWin()),
+                  _soundTestChip('Explosion', const Color(0xFFFF3366), () => GameSoundService().playExplosion()),
+                  _soundTestChip('Sniper Shot', Colors.purpleAccent, () => GameSoundService().playSniper()),
                 ],
               ),
             ],

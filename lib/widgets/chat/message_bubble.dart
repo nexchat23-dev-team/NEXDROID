@@ -20,7 +20,6 @@ class MessageBubble extends StatelessWidget {
   static const Color _neonPurpleEnd = Color(0xFF671FB3);
   static const Color _receivedBubbleBg = Color(0xFF1B1333);
   static const Color _accentCyan = Color(0xFF00E5FF);
-  static const Color _neonGreen = Color(0xFF00FF88);
   static const Color _subTextGrey = Color(0xFF9E8DBE);
   static const Color _whiteText = Color(0xFFF5EFFF);
 
@@ -78,9 +77,42 @@ class MessageBubble extends StatelessWidget {
     return counts;
   }
 
+  static IconData getReactionIcon(String key) {
+    switch (key) {
+      case 'like':
+      case '\uD83D\uDC4D':
+        return Icons.thumb_up_rounded;
+      case 'love':
+      case '\u2764\uFE0F':
+      case '\u2764':
+        return Icons.favorite_rounded;
+      case 'fire':
+      case '\uD83D\uDD25':
+        return Icons.local_fire_department_rounded;
+      case 'laugh':
+      case '\uD83D\uDE02':
+        return Icons.sentiment_very_satisfied_rounded;
+      case 'wow':
+      case '\uD83D\uDE2E':
+        return Icons.sentiment_neutral_rounded;
+      case 'rocket':
+      case '\uD83D\uDE80':
+        return Icons.rocket_launch_rounded;
+      default:
+        return Icons.star_rounded;
+    }
+  }
+
   void _showActionSheet(BuildContext context) {
     HapticFeedback.mediumImpact();
-    const emojis = ['👍', '❤️', '🔥', '😂', '😮', '🚀'];
+    final reactionOptions = [
+      {'key': 'like', 'icon': Icons.thumb_up_rounded, 'color': const Color(0xFF00E5FF)},
+      {'key': 'love', 'icon': Icons.favorite_rounded, 'color': const Color(0xFFFF2A6D)},
+      {'key': 'fire', 'icon': Icons.local_fire_department_rounded, 'color': const Color(0xFFFF9800)},
+      {'key': 'laugh', 'icon': Icons.sentiment_very_satisfied_rounded, 'color': const Color(0xFFFFD700)},
+      {'key': 'wow', 'icon': Icons.sentiment_neutral_rounded, 'color': const Color(0xFFB44FFF)},
+      {'key': 'rocket', 'icon': Icons.rocket_launch_rounded, 'color': const Color(0xFF00FF66)},
+    ];
     final messageId = data['id']?.toString() ?? '';
     final text = data['text']?.toString() ?? '';
 
@@ -105,25 +137,28 @@ class MessageBubble extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 14),
-              // Emoji reaction selector
+              // Icon reaction selector
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: emojis.map((emoji) {
+                  children: reactionOptions.map((opt) {
+                    final key = opt['key'] as String;
+                    final icon = opt['icon'] as IconData;
+                    final color = opt['color'] as Color;
                     return GestureDetector(
                       onTap: () {
                         Navigator.pop(ctx);
-                        onToggleReaction?.call(emoji);
+                        onToggleReaction?.call(key);
                       },
                       child: Container(
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF261247),
+                          color: color.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: Colors.white10),
+                          border: Border.all(color: color.withValues(alpha: 0.4)),
                         ),
-                        child: Text(emoji, style: const TextStyle(fontSize: 24)),
+                        child: Icon(icon, color: color, size: 22),
                       ),
                     );
                   }).toList(),
@@ -181,7 +216,6 @@ class MessageBubble extends StatelessWidget {
     final type = data['type']?.toString() ?? 'text';
     final text = data['text']?.toString() ?? '';
     final imageUrl = data['imageUrl']?.toString() ?? (type == 'image' ? data['fileUrl']?.toString() : null);
-    final fileUrl = data['fileUrl']?.toString();
     final fileName = data['fileName']?.toString() ?? 'Document';
     final fileSize = data['fileSize'] as int?;
     final replyText = data['replyText']?.toString();
@@ -552,9 +586,16 @@ class MessageBubble extends StatelessWidget {
                                     width: 1,
                                   ),
                                 ),
-                                child: Text(
-                                  '${entry.key} ${entry.value}',
-                                  style: const TextStyle(fontSize: 11.5, color: Colors.white),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(getReactionIcon(entry.key), size: 12, color: _accentCyan),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '${entry.value}',
+                                      style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
                                 ),
                               ),
                             );

@@ -388,7 +388,7 @@ class _RustSecurityHubScreenState extends State<RustSecurityHubScreen> with Tick
   }
 
   // -----------------------------------------------------------------
-  // 🛡️ TAB 1: THREAT RADAR & AUDIT SUITE
+  // [TAB 1] THREAT RADAR & AUDIT SUITE
   // -----------------------------------------------------------------
   Widget _buildThreatRadarTab() {
     return SingleChildScrollView(
@@ -1080,7 +1080,7 @@ class _RustSecurityHubScreenState extends State<RustSecurityHubScreen> with Tick
   }
 
   // -----------------------------------------------------------------
-  // 🧱 TAB 4: MEMORY SANDBOX (64-BLOCK RAM MATRIX)
+  // [TAB 4] MEMORY SANDBOX (64-BLOCK RAM MATRIX)
   // -----------------------------------------------------------------
   Widget _buildMemoryTab() {
     int allocated = _memoryBlocks.where((b) => b == 1).length;

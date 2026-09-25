@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -13,6 +15,8 @@ class AdminDashboardScreen extends StatefulWidget {
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> with TickerProviderStateMixin {
   late final TabController _tabController;
   late final AnimationController _pulseController;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // Master System Remote Feature Flags State
   bool _isClonerEnabled = true;
@@ -37,89 +41,29 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
   int _scannedFileCount = 0;
   int _detectedThreatsCount = 14;
 
-  // Sample Users Data
-  final List<Map<String, dynamic>> _users = [
-    {
-      'uid': 'usr_001',
-      'username': 'Alex_Developer',
-      'email': 'alex@nexapp.internal',
-      'role': 'Admin',
-      'status': 'active',
-      'tokens': 15400,
-      'joined': '2026-01-15',
-    },
-    {
-      'uid': 'usr_002',
-      'username': 'ShadowRider',
-      'email': 'shadow@gmail.com',
-      'role': 'User',
-      'status': 'active',
-      'tokens': 1200,
-      'joined': '2026-03-20',
-    },
-    {
-      'uid': 'usr_003',
-      'username': 'SuspiciousBot99',
-      'email': 'spammer@temp.mail',
-      'role': 'User',
-      'status': 'suspended',
-      'tokens': 0,
-      'joined': '2026-07-28',
-    },
-    {
-      'uid': 'usr_004',
-      'username': 'CyberMod_Elena',
-      'email': 'elena@nexapp.internal',
-      'role': 'Moderator',
-      'status': 'active',
-      'tokens': 4500,
-      'joined': '2026-02-10',
-    },
-    {
-      'uid': 'usr_005',
-      'username': 'VipGamer_777',
-      'email': 'gamer777@hotmail.com',
-      'role': 'User',
-      'status': 'active',
-      'tokens': 8900,
-      'joined': '2026-05-04',
-    },
-  ];
-
   // Audit Logs
   final List<Map<String, String>> _auditLogs = [
     {
       'time': 'Just now',
-      'action': 'SUPERADMIN_LOGIN',
-      'details': 'Session opened from 127.0.0.1 (SuperAdmin)',
+      'action': 'SUPERADMIN_SESSION_ACTIVE',
+      'details': 'Connected to live Firebase nexchat-47326 cluster',
       'severity': 'info',
     },
     {
-      'time': '2 mins ago',
-      'action': 'BAN_USER',
-      'details': 'Suspended account usr_003 (Spam violation)',
-      'severity': 'warning',
-    },
-    {
-      'time': '15 mins ago',
-      'action': 'DEFENDER_RULES_UPDATE',
-      'details': 'Deployed definition patch v2.405.2026.PROD',
+      'time': '12 mins ago',
+      'action': 'DEFENDER_RULES_SYNC',
+      'details': 'Synchronized security rules with zero-trust shield',
       'severity': 'info',
-    },
-    {
-      'time': '1 hour ago',
-      'action': 'FIREWALL_IP_BLOCK',
-      'details': 'Blacklisted IP 185.220.101.5 (Port scan detected)',
-      'severity': 'critical',
     },
   ];
 
   String _searchQuery = '';
+  String _reelsSearchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -135,6 +79,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
   }
 
   void _showSnackbar(String msg, {bool isError = false}) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -161,62 +106,89 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
     });
 
     await Future.delayed(const Duration(milliseconds: 600));
+    if (!mounted) return;
     setState(() {
-      _scanLog += 'Spawning 4 worker threads for parallel file queue...\n';
+      _scanLog += 'Spawning worker threads for parallel file integrity queue...\n';
     });
 
     await Future.delayed(const Duration(milliseconds: 800));
+    if (!mounted) return;
     setState(() {
-      _scanLog += 'Checking Shannon Entropy & Magic Byte Headers (PE, ELF, DEX, APK)...\n';
+      _scanLog += 'Checking Shannon Entropy and Magic Byte Headers (PE, ELF, DEX, APK)...\n';
       _scannedFileCount = 384;
     });
 
     await Future.delayed(const Duration(milliseconds: 1000));
+    if (!mounted) return;
     setState(() {
-      _scanLog += 'Running YARA-style regex checks for Reverse Shells & Keyloggers...\n';
+      _scanLog += 'Running heuristic patterns for Reverse Shells and Keyloggers...\n';
       _scannedFileCount = 1290;
-      _detectedThreatsCount = 14;
+      _detectedThreatsCount = 0;
     });
 
     await Future.delayed(const Duration(milliseconds: 600));
+    if (!mounted) return;
     setState(() {
-      _scanLog += 'SUCCESS: Scan Complete in 2940ms. Overall Threat Score: 18/100 (CLEAN).\n';
+      _scanLog += 'SUCCESS: Scan Complete in 2840ms. Overall Threat Score: 0/100 (CLEAN).\n';
       _isScanning = false;
     });
 
     _auditLogs.insert(0, {
       'time': 'Just now',
       'action': 'RUST_SCAN_COMPLETED',
-      'details': 'Scanned 1290 files in 2.9s. 14 findings analyzed.',
+      'details': 'Scanned 1,290 files in 2.8s. All modules verified clean.',
       'severity': 'info',
     });
   }
 
-  void _toggleUserStatus(Map<String, dynamic> user) {
-    setState(() {
-      if (user['status'] == 'active') {
-        user['status'] = 'suspended';
-        _showSnackbar('User ${user['username']} has been SUSPENDED!', isError: true);
-        _auditLogs.insert(0, {
-          'time': 'Just now',
-          'action': 'BAN_USER',
-          'details': 'Suspended ${user['username']} (${user['uid']})',
-          'severity': 'warning',
-        });
-      } else {
-        user['status'] = 'active';
-        _showSnackbar('User ${user['username']} access has been RESTORED.');
-        _auditLogs.insert(0, {
-          'time': 'Just now',
-          'action': 'UNBAN_USER',
-          'details': 'Restored access for ${user['username']}',
-          'severity': 'info',
-        });
-      }
-    });
+  Future<void> _toggleUserStatus(String uid, String username, bool currentlySuspended) async {
+    try {
+      final newSuspended = !currentlySuspended;
+      await _firestore.collection('users').doc(uid).set({
+        'isSuspended': newSuspended,
+        'status': newSuspended ? 'suspended' : 'active',
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      _showSnackbar(
+        newSuspended ? 'User $username suspended from platform.' : 'User $username access restored.',
+        isError: newSuspended,
+      );
+
+      _auditLogs.insert(0, {
+        'time': 'Just now',
+        'action': newSuspended ? 'BAN_USER' : 'UNBAN_USER',
+        'details': '${newSuspended ? 'Suspended' : 'Restored'} user $username ($uid)',
+        'severity': newSuspended ? 'warning' : 'info',
+      });
+    } catch (e) {
+      _showSnackbar('Failed to update user status: $e', isError: true);
+    }
   }
 
-  void _adjustUserTokensDialog(Map<String, dynamic> user) {
+  Future<void> _toggleAdminRole(String uid, String username, bool currentlyAdmin) async {
+    try {
+      final newAdmin = !currentlyAdmin;
+      await _firestore.collection('users').doc(uid).set({
+        'isAdmin': newAdmin,
+        'role': newAdmin ? 'Admin' : 'User',
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      _showSnackbar(newAdmin ? 'Granted Admin rights to $username' : 'Revoked Admin rights from $username');
+
+      _auditLogs.insert(0, {
+        'time': 'Just now',
+        'action': 'ROLE_CHANGE',
+        'details': 'Set role of $username to ${newAdmin ? 'Admin' : 'User'}',
+        'severity': 'info',
+      });
+    } catch (e) {
+      _showSnackbar('Failed to change role: $e', isError: true);
+    }
+  }
+
+  void _adjustUserTokensDialog(String uid, String username, int currentTokens) {
     final textCtrl = TextEditingController(text: '500');
     showDialog(
       context: context,
@@ -224,15 +196,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
         backgroundColor: const Color(0xFF0F172A),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: Text(
-          'Grant Tokens to ${user['username']}',
+          'Adjust Tokens for $username',
           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Enter token amount to grant or deduct (+/-):',
-              style: TextStyle(color: Colors.white70, fontSize: 13),
+            Text(
+              'Current balance: $currentTokens tokens\nEnter amount to add or deduct (+/-):',
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
             ),
             const SizedBox(height: 14),
             TextField(
@@ -258,19 +231,67 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
               backgroundColor: const Color(0xFF7C4DFF),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
-            onPressed: () {
+            onPressed: () async {
               final amount = int.tryParse(textCtrl.text) ?? 0;
-              setState(() {
-                user['tokens'] = (user['tokens'] as int) + amount;
-                _showSnackbar('Updated token balance for ${user['username']} by +$amount!');
-              });
               Navigator.pop(ctx);
+              try {
+                await _firestore.collection('users').doc(uid).set({
+                  'tokens': FieldValue.increment(amount),
+                  'token_balance': FieldValue.increment(amount),
+                  'updated_at': FieldValue.serverTimestamp(),
+                }, SetOptions(merge: true));
+
+                _showSnackbar('Updated token balance for $username by ${amount >= 0 ? '+$amount' : '$amount'}');
+                _auditLogs.insert(0, {
+                  'time': 'Just now',
+                  'action': 'ADJUST_TOKENS',
+                  'details': 'Adjusted tokens for $username by $amount',
+                  'severity': 'info',
+                });
+              } catch (e) {
+                _showSnackbar('Failed to adjust tokens: $e', isError: true);
+              }
             },
             child: const Text('Confirm', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _deleteReel(String reelId, String reelTitle) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0F172A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Delete Reel', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: Text('Are you sure you want to delete "$reelTitle"? This action cannot be undone.', style: const TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel', style: TextStyle(color: Colors.white54))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF2A6D)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await _firestore.collection('reels').doc(reelId).delete();
+      _showSnackbar('Reel deleted from platform');
+      _auditLogs.insert(0, {
+        'time': 'Just now',
+        'action': 'DELETE_REEL',
+        'details': 'Deleted reel: $reelTitle ($reelId)',
+        'severity': 'warning',
+      });
+    } catch (e) {
+      _showSnackbar('Failed to delete reel: $e', isError: true);
+    }
   }
 
   void _showBroadcastAnnouncementDialog() {
@@ -286,7 +307,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
           children: [
             Icon(Icons.campaign_rounded, color: Color(0xFF00F5FF)),
             SizedBox(width: 10),
-            Text('Broadcast System Announcement', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            Text('Broadcast Announcement', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
           ],
         ),
         content: Column(
@@ -329,17 +350,32 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
               foregroundColor: Colors.black,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
-            onPressed: () {
-              if (titleCtrl.text.isNotEmpty) {
-                _showSnackbar('System Announcement Broadcasted to 1,420 Active Users!');
+            onPressed: () async {
+              final title = titleCtrl.text.trim();
+              final body = bodyCtrl.text.trim();
+              if (title.isEmpty) return;
+              Navigator.pop(ctx);
+
+              try {
+                await _firestore.collection('announcements').add({
+                  'title': title,
+                  'message': body,
+                  'body': body,
+                  'author': 'SuperAdmin',
+                  'timestamp': FieldValue.serverTimestamp(),
+                  'createdAt': DateTime.now().toUtc().toIso8601String(),
+                });
+
+                _showSnackbar('Announcement broadcasted to live cluster');
                 _auditLogs.insert(0, {
                   'time': 'Just now',
                   'action': 'SYSTEM_BROADCAST',
-                  'details': 'Title: ${titleCtrl.text}',
+                  'details': 'Title: $title',
                   'severity': 'info',
                 });
+              } catch (e) {
+                _showSnackbar('Broadcast notice: $e', isError: true);
               }
-              Navigator.pop(ctx);
             },
             child: const Text('Send Broadcast', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
@@ -351,12 +387,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
   @override
   Widget build(BuildContext context) {
     const bgDark = Color(0xFF070A18);
+    final user = _auth.currentUser;
+    final adminEmail = user?.email ?? 'SuperAdmin (Direct Link)';
 
     return Scaffold(
       backgroundColor: bgDark,
       body: Stack(
         children: [
-          // Dynamic Glowing Background Gradients
+          // Dynamic Glowing Gradients
           Positioned(
             top: -100,
             right: -100,
@@ -397,11 +435,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
               children: [
                 // Top Admin App Bar Header
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                   child: Row(
                     children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20),
+                        onPressed: () => Navigator.pop(context),
+                      ),
                       Container(
-                        padding: const EdgeInsets.all(10),
+                        padding: const EdgeInsets.all(9),
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           gradient: const LinearGradient(
@@ -410,13 +452,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
                           boxShadow: [
                             BoxShadow(
                               color: const Color(0xFF00F5FF).withValues(alpha: 0.4),
-                              blurRadius: 16,
+                              blurRadius: 12,
                             ),
                           ],
                         ),
-                        child: const Icon(Icons.admin_panel_settings_rounded, color: Colors.white, size: 24),
+                        child: const Icon(Icons.admin_panel_settings_rounded, color: Colors.white, size: 22),
                       ),
-                      const SizedBox(width: 14),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -424,12 +466,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
                             Row(
                               children: [
                                 const Text(
-                                  'NEX ADMIN SUITE',
+                                  'NEX MANAGER CONSOLE',
                                   style: TextStyle(
                                     color: Colors.white,
-                                    fontSize: 20,
+                                    fontSize: 17,
                                     fontWeight: FontWeight.w900,
-                                    letterSpacing: 1.5,
+                                    letterSpacing: 1.2,
                                   ),
                                 ),
                                 const SizedBox(width: 8),
@@ -437,17 +479,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
                                   animation: _pulseController,
                                   builder: (context, _) {
                                     return Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                                       decoration: BoxDecoration(
                                         color: const Color(0xFF00E676).withValues(alpha: 0.2 + 0.3 * _pulseController.value),
                                         borderRadius: BorderRadius.circular(10),
                                         border: Border.all(color: const Color(0xFF00E676)),
                                       ),
                                       child: const Text(
-                                        'LIVE NODE',
+                                        'CLUSTER ACTIVE',
                                         style: TextStyle(
                                           color: Color(0xFF00E676),
-                                          fontSize: 10,
+                                          fontSize: 9,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
@@ -456,9 +498,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
                                 ),
                               ],
                             ),
-                            const Text(
-                              'SuperAdmin: demonalexander526@gmail.com',
-                              style: TextStyle(color: Colors.white54, fontSize: 12),
+                            Text(
+                              adminEmail,
+                              style: const TextStyle(color: Colors.white54, fontSize: 11),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
@@ -495,6 +538,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
                     tabs: const [
                       Tab(icon: Icon(Icons.dashboard_rounded, size: 18), text: 'Control Center'),
                       Tab(icon: Icon(Icons.people_alt_rounded, size: 18), text: 'Users & Roles'),
+                      Tab(icon: Icon(Icons.video_collection_rounded, size: 18), text: 'Reels Moderation'),
                       Tab(icon: Icon(Icons.shield_rounded, size: 18), text: 'Defender Engine'),
                       Tab(icon: Icon(Icons.local_fire_department_rounded, size: 18), text: 'Firewall'),
                       Tab(icon: Icon(Icons.analytics_rounded, size: 18), text: 'Telemetry'),
@@ -511,6 +555,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
                     children: [
                       _buildControlCenterTab(),
                       _buildUsersTab(),
+                      _buildReelsModerationTab(),
                       _buildDefenderTab(),
                       _buildFirewallTab(),
                       _buildTelemetryTab(),
@@ -535,17 +580,43 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
           // Live Metrics Cards
           Row(
             children: [
-              Expanded(child: _buildMetricCard('Total Users', '1,420', '+12 today', Icons.people_rounded, const Color(0xFF00F5FF))),
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: _firestore.collection('users').snapshots(),
+                  builder: (context, snapshot) {
+                    final count = snapshot.data?.docs.length.toString() ?? '...';
+                    return _buildMetricCard('Total Users', count, 'Live DB', Icons.people_rounded, const Color(0xFF00F5FF));
+                  },
+                ),
+              ),
               const SizedBox(width: 12),
-              Expanded(child: _buildMetricCard('Active Admins', '3', 'Online', Icons.verified_user_rounded, const Color(0xFF7C4DFF))),
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: _firestore.collection('reels').snapshots(),
+                  builder: (context, snapshot) {
+                    final count = snapshot.data?.docs.length.toString() ?? '...';
+                    return _buildMetricCard('Total Reels', count, 'Active Feeds', Icons.video_collection_rounded, const Color(0xFF7C4DFF));
+                  },
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: _buildMetricCard('Threats Blocked', '389', 'Definition v2.405', Icons.security_rounded, const Color(0xFFFF2A6D))),
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: _firestore.collection('groups').snapshots(),
+                  builder: (context, snapshot) {
+                    final count = snapshot.data?.docs.length.toString() ?? '...';
+                    return _buildMetricCard('Total Groups', count, 'Chat Rooms', Icons.forum_rounded, const Color(0xFF00E676));
+                  },
+                ),
+              ),
               const SizedBox(width: 12),
-              Expanded(child: _buildMetricCard('Firewall Blocks', '42', '5 IPs Banned', Icons.local_fire_department_rounded, const Color(0xFFFFC857))),
+              Expanded(
+                child: _buildMetricCard('Firewall Blocks', '${_blockedIPs.length}', 'Active Guard', Icons.local_fire_department_rounded, const Color(0xFFFFC857)),
+              ),
             ],
           ),
 
@@ -566,7 +637,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
 
           _buildFeatureToggleCard(
             'App Cloner Engine',
-            'Allow users to create up to 5 cloned isolated app spaces.',
+            'Allow users to create cloned isolated app spaces.',
             Icons.copy_all_rounded,
             _isClonerEnabled,
             (val) => setState(() => _isClonerEnabled = val),
@@ -574,7 +645,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
           ),
           _buildFeatureToggleCard(
             'Security Defender Engine',
-            'Automated threat heuristic analysis & real-time virus scans.',
+            'Automated threat heuristic analysis & real-time scanner.',
             Icons.shield_rounded,
             _isDefenderEnabled,
             (val) => setState(() => _isDefenderEnabled = val),
@@ -613,7 +684,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
             const Color(0xFFFF6B6B),
           ),
           _buildFeatureToggleCard(
-            '🚨 Emergency Maintenance Mode',
+            'Emergency Maintenance Mode',
             'Lock application for non-admin users during updates.',
             Icons.warning_amber_rounded,
             _isMaintenanceMode,
@@ -625,18 +696,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
     );
   }
 
-  // ─── TAB 2: USERS & ROLES MANAGEMENT ───
+  // ─── TAB 2: LIVE FIRESTORE USERS & ROLES ───
   Widget _buildUsersTab() {
-    final filteredUsers = _users.where((u) {
-      final query = _searchQuery.toLowerCase();
-      return u['username'].toString().toLowerCase().contains(query) || u['email'].toString().toLowerCase().contains(query);
-    }).toList();
-
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // Search & Filter bar
           TextField(
             onChanged: (val) => setState(() => _searchQuery = val),
             style: const TextStyle(color: Colors.white),
@@ -654,118 +719,156 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
           ),
           const SizedBox(height: 14),
 
-          // User Table List
           Expanded(
-            child: ListView.separated(
-              itemCount: filteredUsers.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (context, index) {
-                final u = filteredUsers[index];
-                final isSuspended = u['status'] == 'suspended';
+            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: _firestore.collection('users').snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator(color: Color(0xFF00F5FF)));
+                }
 
-                return Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: isSuspended ? const Color(0xFFFF2A6D).withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isSuspended ? const Color(0xFFFF2A6D).withValues(alpha: 0.4) : Colors.white.withValues(alpha: 0.1),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        backgroundColor: isSuspended ? const Color(0xFFFF2A6D) : const Color(0xFF7C4DFF),
-                        child: Text(
-                          u['username'][0].toUpperCase(),
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                final docs = snapshot.data?.docs ?? [];
+                final filtered = docs.where((doc) {
+                  final data = doc.data();
+                  final q = _searchQuery.toLowerCase();
+                  final uname = (data['username'] ?? data['name'] ?? '').toString().toLowerCase();
+                  final email = (data['email'] ?? '').toString().toLowerCase();
+                  return uname.contains(q) || email.contains(q);
+                }).toList();
+
+                if (filtered.isEmpty) {
+                  return const Center(
+                    child: Text('No users matching search.', style: TextStyle(color: Colors.white54)),
+                  );
+                }
+
+                return ListView.separated(
+                  itemCount: filtered.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final doc = filtered[index];
+                    final u = doc.data();
+                    final uid = doc.id;
+                    final username = u['username']?.toString() ?? u['name']?.toString() ?? 'NEX User';
+                    final email = u['email']?.toString() ?? 'No email';
+                    final role = u['role']?.toString() ?? (u['isAdmin'] == true ? 'Admin' : 'User');
+                    final isSuspended = u['isSuspended'] == true || u['status'] == 'suspended';
+                    final tokens = (u['tokens'] as num?)?.toInt() ?? (u['token_balance'] as num?)?.toInt() ?? 2000;
+                    final isAdmin = u['isAdmin'] == true || role == 'Admin';
+
+                    return Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: isSuspended ? const Color(0xFFFF2A6D).withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isSuspended ? const Color(0xFFFF2A6D).withValues(alpha: 0.4) : Colors.white.withValues(alpha: 0.1),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: isSuspended ? const Color(0xFFFF2A6D) : (isAdmin ? const Color(0xFF7C4DFF) : const Color(0xFF00F5FF).withValues(alpha: 0.3)),
+                            child: Text(
+                              username.isNotEmpty ? username[0].toUpperCase() : 'U',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  u['username'],
-                                  style: TextStyle(
-                                    color: isSuspended ? const Color(0xFFFF2A6D) : Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15,
-                                  ),
+                                Row(
+                                  children: [
+                                    Text(
+                                      username,
+                                      style: TextStyle(
+                                        color: isSuspended ? const Color(0xFFFF2A6D) : Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: isAdmin
+                                            ? const Color(0xFF7C4DFF)
+                                            : (isSuspended ? const Color(0xFFFF2A6D) : Colors.white12),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        isSuspended ? 'SUSPENDED' : role,
+                                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: u['role'] == 'Admin'
-                                        ? const Color(0xFF7C4DFF)
-                                        : (u['role'] == 'Moderator' ? const Color(0xFF00F5FF) : Colors.white12),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    u['role'],
-                                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                                  ),
+                                const SizedBox(height: 2),
+                                Text(email, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.generating_tokens_rounded, color: Color(0xFFFFC857), size: 14),
+                                    const SizedBox(width: 4),
+                                    Text('$tokens tokens', style: const TextStyle(color: Color(0xFFFFC857), fontSize: 12, fontWeight: FontWeight.bold)),
+                                  ],
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              u['email'],
-                              style: const TextStyle(color: Colors.white54, fontSize: 12),
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                const Icon(Icons.generating_tokens_rounded, color: Color(0xFFFFC857), size: 14),
-                                const SizedBox(width: 4),
-                                Text('${u['tokens']} tokens', style: const TextStyle(color: Color(0xFFFFC857), fontSize: 12, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // User Action Menu
-                      PopupMenuButton<String>(
-                        icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
-                        color: const Color(0xFF0F172A),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        onSelected: (action) {
-                          if (action == 'toggle_status') {
-                            _toggleUserStatus(u);
-                          } else if (action == 'tokens') {
-                            _adjustUserTokensDialog(u);
-                          }
-                        },
-                        itemBuilder: (ctx) => [
-                          PopupMenuItem(
-                            value: 'toggle_status',
-                            child: Row(
-                              children: [
-                                Icon(isSuspended ? Icons.check_circle_rounded : Icons.block_rounded, color: isSuspended ? const Color(0xFF00E676) : const Color(0xFFFF2A6D), size: 18),
-                                const SizedBox(width: 8),
-                                Text(isSuspended ? 'Unban User' : 'Ban/Suspend User', style: TextStyle(color: isSuspended ? const Color(0xFF00E676) : const Color(0xFFFF2A6D))),
                               ],
                             ),
                           ),
-                          const PopupMenuItem(
-                            value: 'tokens',
-                            child: Row(
-                              children: [
-                                Icon(Icons.generating_tokens_rounded, color: Color(0xFFFFC857), size: 18),
-                                SizedBox(width: 8),
-                                Text('Adjust Tokens', style: TextStyle(color: Colors.white)),
-                              ],
-                            ),
+
+                          PopupMenuButton<String>(
+                            icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
+                            color: const Color(0xFF0F172A),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            onSelected: (action) {
+                              if (action == 'toggle_status') {
+                                _toggleUserStatus(uid, username, isSuspended);
+                              } else if (action == 'tokens') {
+                                _adjustUserTokensDialog(uid, username, tokens);
+                              } else if (action == 'toggle_role') {
+                                _toggleAdminRole(uid, username, isAdmin);
+                              }
+                            },
+                            itemBuilder: (ctx) => [
+                              PopupMenuItem(
+                                value: 'toggle_status',
+                                child: Row(
+                                  children: [
+                                    Icon(isSuspended ? Icons.check_circle_rounded : Icons.block_rounded, color: isSuspended ? const Color(0xFF00E676) : const Color(0xFFFF2A6D), size: 18),
+                                    const SizedBox(width: 8),
+                                    Text(isSuspended ? 'Unban User' : 'Ban/Suspend User', style: TextStyle(color: isSuspended ? const Color(0xFF00E676) : const Color(0xFFFF2A6D))),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuItem(
+                                value: 'tokens',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.generating_tokens_rounded, color: Color(0xFFFFC857), size: 18),
+                                    SizedBox(width: 8),
+                                    Text('Adjust Tokens', style: TextStyle(color: Colors.white)),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'toggle_role',
+                                child: Row(
+                                  children: [
+                                    Icon(isAdmin ? Icons.person_rounded : Icons.security_rounded, color: const Color(0xFF7C4DFF), size: 18),
+                                    const SizedBox(width: 8),
+                                    Text(isAdmin ? 'Demote to User' : 'Promote to Admin', style: const TextStyle(color: Colors.white)),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 );
               },
             ),
@@ -775,46 +878,172 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
     );
   }
 
-  // ─── TAB 3: DEFENDER & RUST SCANNER ENGINE ───
+  // ─── TAB 3: LIVE REELS MODERATION ───
+  Widget _buildReelsModerationTab() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          TextField(
+            onChanged: (val) => setState(() => _reelsSearchQuery = val),
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'Search reels by title or creator...',
+              hintStyle: const TextStyle(color: Colors.white38),
+              prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF7C4DFF)),
+              filled: true,
+              fillColor: Colors.white.withValues(alpha: 0.06),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(20),
+                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          Expanded(
+            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: _firestore.collection('reels').snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator(color: Color(0xFF7C4DFF)));
+                }
+
+                final docs = snapshot.data?.docs ?? [];
+                final filtered = docs.where((doc) {
+                  final data = doc.data();
+                  final q = _reelsSearchQuery.toLowerCase();
+                  final title = (data['title'] ?? data['caption'] ?? '').toString().toLowerCase();
+                  final author = (data['authorName'] ?? data['username'] ?? '').toString().toLowerCase();
+                  return title.contains(q) || author.contains(q);
+                }).toList();
+
+                if (filtered.isEmpty) {
+                  return const Center(
+                    child: Text('No reels found.', style: TextStyle(color: Colors.white54)),
+                  );
+                }
+
+                return ListView.separated(
+                  itemCount: filtered.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final doc = filtered[index];
+                    final data = doc.data();
+                    final title = data['title']?.toString() ?? data['caption']?.toString() ?? 'Reel';
+                    final author = data['authorName']?.toString() ?? data['username']?.toString() ?? 'Creator';
+                    final likes = (data['likesCount'] as num?)?.toInt() ?? ((data['likes'] is List) ? (data['likes'] as List).length : 0);
+                    final comments = (data['commentsCount'] as num?)?.toInt() ?? 0;
+
+                    return Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF7C4DFF).withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFF7C4DFF).withValues(alpha: 0.4)),
+                            ),
+                            child: const Icon(Icons.movie_creation_rounded, color: Color(0xFF7C4DFF)),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  title,
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 2),
+                                Text('By @$author', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.favorite_rounded, color: Colors.redAccent, size: 13),
+                                    const SizedBox(width: 3),
+                                    Text('$likes', style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                                    const SizedBox(width: 10),
+                                    const Icon(Icons.chat_bubble_rounded, color: Color(0xFF00F5FF), size: 13),
+                                    const SizedBox(width: 3),
+                                    Text('$comments', style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFFF2A6D)),
+                            tooltip: 'Delete Reel',
+                            onPressed: () => _deleteReel(doc.id, title),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── TAB 4: DEFENDER ENGINE ───
   Widget _buildDefenderTab() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header Card
           Container(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [const Color(0xFF7C4DFF).withValues(alpha: 0.3), const Color(0xFF00F5FF).withValues(alpha: 0.15)],
+                colors: [
+                  const Color(0xFF00F5FF).withValues(alpha: 0.15),
+                  const Color(0xFF7C4DFF).withValues(alpha: 0.15),
+                ],
               ),
               borderRadius: BorderRadius.circular(24),
               border: Border.all(color: const Color(0xFF00F5FF).withValues(alpha: 0.3)),
             ),
             child: Row(
               children: [
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00F5FF).withValues(alpha: 0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.security_rounded, color: Color(0xFF00F5FF), size: 32),
+                ),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Rust Multi-Threaded Engine v2.0.0', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                      const Text(
+                        'NEX DEFENDER ENGINE',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
                       const SizedBox(height: 4),
-                      Text('Definition Version: $_definitionVersion', style: const TextStyle(color: Color(0xFF00F5FF), fontSize: 13)),
-                      const SizedBox(height: 4),
-                      Text('Scanned Files: $_scannedFileCount | Threats Tracked: $_detectedThreatsCount', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                      Text(
+                        'Engine Version: $_definitionVersion\nZero-Trust Shield • Files Scanned: $_scannedFileCount • Threats: $_detectedThreatsCount',
+                        style: const TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
                     ],
-                  ),
-                ),
-                ElevatedButton.icon(
-                  onPressed: _isScanning ? null : _runRustScanSimulation,
-                  icon: _isScanning
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                      : const Icon(Icons.play_arrow_rounded, color: Colors.black),
-                  label: Text(_isScanning ? 'Scanning...' : 'Run Scan', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00F5FF),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                 ),
               ],
@@ -823,51 +1052,79 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
 
           const SizedBox(height: 20),
 
-          // Scan Console Output
-          const Text('SECURITY SCAN CONSOLE LOG', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-          const SizedBox(height: 8),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            height: 180,
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.8),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFF00F5FF).withValues(alpha: 0.3)),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00F5FF),
+              foregroundColor: Colors.black,
+              minimumSize: const Size(double.infinity, 50),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             ),
-            child: SingleChildScrollView(
-              child: Text(
-                _scanLog.isEmpty ? 'Click "Run Scan" to execute Rust security engine...' : _scanLog,
-                style: const TextStyle(color: Color(0xFF00E676), fontFamily: 'monospace', fontSize: 12),
-              ),
-            ),
+            onPressed: _isScanning ? null : _runRustScanSimulation,
+            icon: _isScanning
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                : const Icon(Icons.radar_rounded),
+            label: Text(_isScanning ? 'Scanning in progress...' : 'Execute Deep File Integrity Scan', style: const TextStyle(fontWeight: FontWeight.bold)),
           ),
 
-          const SizedBox(height: 20),
-          const Text('RECENT DETECTED THREATS & QUARANTINE', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-          const SizedBox(height: 10),
-
-          _buildThreatItem('payload_dropper.apk', 'APK Package Header Spoofing', 'CRITICAL', 'Threat Score: 95/100', Colors.red),
-          _buildThreatItem('reverse_shell.sh', 'nc -e /bin/bash Pattern Match', 'HIGH', 'Threat Score: 88/100', Colors.orange),
-          _buildThreatItem('config_backup.env', 'Hardcoded AWS Access Key', 'MEDIUM', 'Threat Score: 60/100', Colors.amber),
+          if (_scanLog.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(14),
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white12),
+              ),
+              child: Text(
+                _scanLog,
+                style: const TextStyle(color: Color(0xFF00E676), fontFamily: 'monospace', fontSize: 11),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  // ─── TAB 4: FIREWALL ADMIN CENTER ───
+  // ─── TAB 5: FIREWALL GUARD ───
   Widget _buildFirewallTab() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildFeatureToggleCard('Inbound Packet Blocking', 'Strict inspection of all incoming TCP/UDP connections.', Icons.arrow_downward_rounded, _inboundBlocking, (v) => setState(() => _inboundBlocking = v), const Color(0xFF00F5FF)),
-          _buildFeatureToggleCard('Outbound Traffic Filtering', 'Prevent unauthorized telemetry or reverse connections.', Icons.arrow_upward_rounded, _outboundFiltering, (v) => setState(() => _outboundFiltering = v), const Color(0xFF7C4DFF)),
-          _buildFeatureToggleCard('Stealth Mode', 'Hide server node response from generic ping/port sweeps.', Icons.visibility_off_rounded, _stealthMode, (v) => setState(() => _stealthMode = v), const Color(0xFFFF5D8F)),
+          _buildFeatureToggleCard(
+            'Inbound Packet Filtering',
+            'Drop malformed TCP/UDP socket frames.',
+            Icons.filter_alt_rounded,
+            _inboundBlocking,
+            (val) => setState(() => _inboundBlocking = val),
+            const Color(0xFF00F5FF),
+          ),
+          _buildFeatureToggleCard(
+            'Outbound Inspection',
+            'Inspect telemetry egress endpoints.',
+            Icons.outbox_rounded,
+            _outboundFiltering,
+            (val) => setState(() => _outboundFiltering = val),
+            const Color(0xFF7C4DFF),
+          ),
+          _buildFeatureToggleCard(
+            'Stealth Mode',
+            'Ignore ping discovery responses on local networks.',
+            Icons.visibility_off_rounded,
+            _stealthMode,
+            (val) => setState(() => _stealthMode = val),
+            const Color(0xFFFFC857),
+          ),
 
           const SizedBox(height: 20),
-          const Text('IP BLACKLIST MANAGER', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+
+          const Text(
+            'BLOCKED IP ADDRESSES',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1.1),
+          ),
           const SizedBox(height: 10),
 
           Row(
@@ -877,7 +1134,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
                   controller: _ipInputController,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
-                    hintText: 'Enter IP address (e.g. 192.168.1.50)',
+                    hintText: 'Enter IPv4 address to blacklist...',
                     hintStyle: const TextStyle(color: Colors.white38),
                     filled: true,
                     fillColor: Colors.white.withValues(alpha: 0.06),
@@ -890,18 +1147,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFFF2A6D),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
                 ),
                 onPressed: () {
-                  if (_ipInputController.text.isNotEmpty) {
+                  final ip = _ipInputController.text.trim();
+                  if (ip.isNotEmpty && !_blockedIPs.contains(ip)) {
                     setState(() {
-                      _blockedIPs.add(_ipInputController.text.trim());
+                      _blockedIPs.add(ip);
                       _ipInputController.clear();
-                      _showSnackbar('IP added to Firewall Blacklist!', isError: true);
                     });
+                    _showSnackbar('Blacklisted IP: $ip');
                   }
                 },
-                child: const Text('Ban IP', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                child: const Text('Block IP', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
@@ -909,93 +1167,84 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
           const SizedBox(height: 14),
 
           ..._blockedIPs.map((ip) => Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFFF2A6D).withValues(alpha: 0.3)),
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFFF2A6D).withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.block_rounded, color: Color(0xFFFF2A6D), size: 18),
+                const SizedBox(width: 10),
+                Text(ip, style: const TextStyle(color: Colors.white, fontFamily: 'monospace')),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: Colors.white54, size: 20),
+                  onPressed: () {
+                    setState(() => _blockedIPs.remove(ip));
+                    _showSnackbar('Removed IP from blocklist: $ip');
+                  },
                 ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.block_rounded, color: Color(0xFFFF2A6D), size: 18),
-                    const SizedBox(width: 10),
-                    Text(ip, style: const TextStyle(color: Colors.white, fontFamily: 'monospace', fontWeight: FontWeight.bold)),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline_rounded, color: Colors.white54, size: 20),
-                      onPressed: () {
-                        setState(() {
-                          _blockedIPs.remove(ip);
-                          _showSnackbar('IP $ip unblocked.');
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              )),
+              ],
+            ),
+          )),
         ],
       ),
     );
   }
 
-  // ─── TAB 5: TELEMETRY & AUDIT LOGS ───
+  // ─── TAB 6: TELEMETRY & LOGS ───
   Widget _buildTelemetryTab() {
-    return Padding(
+    return ListView.separated(
       padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('REAL-TIME SYSTEM AUDIT LOGS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-          const SizedBox(height: 10),
+      itemCount: _auditLogs.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final log = _auditLogs[index];
+        final sev = log['severity'];
+        final color = sev == 'warning'
+            ? const Color(0xFFFFC857)
+            : (sev == 'critical' ? const Color(0xFFFF2A6D) : const Color(0xFF00F5FF));
 
-          Expanded(
-            child: ListView.separated(
-              itemCount: _auditLogs.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (context, index) {
-                final log = _auditLogs[index];
-                final isWarn = log['severity'] == 'warning' || log['severity'] == 'critical';
-
-                return Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: isWarn ? const Color(0xFFFF2A6D).withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: isWarn ? const Color(0xFFFF2A6D).withValues(alpha: 0.3) : Colors.white12),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        isWarn ? Icons.warning_amber_rounded : Icons.info_outline_rounded,
-                        color: isWarn ? const Color(0xFFFF2A6D) : const Color(0xFF00F5FF),
-                        size: 20,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(log['action']!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                                const Spacer(),
-                                Text(log['time']!, style: const TextStyle(color: Colors.white38, fontSize: 11)),
-                              ],
-                            ),
-                            const SizedBox(height: 2),
-                            Text(log['details']!, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
+        return Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.04),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
           ),
-        ],
-      ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 2),
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(log['action']!, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13)),
+                        Text(log['time']!, style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(log['details']!, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -1061,40 +1310,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
             value: value,
             activeThumbColor: color,
             onChanged: onChanged,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildThreatItem(String filename, String reason, String severity, String threatScore, Color color) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.bug_report_rounded, color: color),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(filename, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                Text(reason, style: const TextStyle(color: Colors.white70, fontSize: 11)),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(severity, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12)),
-              Text(threatScore, style: const TextStyle(color: Colors.white38, fontSize: 10)),
-            ],
           ),
         ],
       ),

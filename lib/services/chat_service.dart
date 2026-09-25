@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'auth_service.dart';
+import 'cloudinary_storage_service.dart';
 import 'firebase_service.dart';
 import 'upload_progress_service.dart';
 
@@ -104,128 +105,163 @@ class ChatService {
     // 3. Update last message
     String preview = text.isNotEmpty ? text : 'New message';
     if (type == 'image') {
-      preview = '📷 Photo';
+      preview = '[Photo]';
     } else if (type == 'audio') {
-      preview = '🎤 Voice note';
+      preview = '[Voice note]';
     } else if (type == 'file' || type == 'document') {
-      preview = '📄 ${fileName ?? 'Document'}';
+      preview = '[File] ${fileName ?? 'Document'}';
     }
     await updateLastMessage(conversationId, preview);
   }
 
   Future<String> uploadAudioMessage(String conversationId, String filePath) async {
+    final file = File(filePath);
+    final fileName = file.uri.pathSegments.last;
+    final fileSize = await file.length();
+    final uploadId = 'audio_${DateTime.now().millisecondsSinceEpoch}';
+    final uploadService = UploadProgressService();
+
+    uploadService.startUpload(
+      id: uploadId,
+      fileName: 'Audio: $fileName',
+      totalBytes: fileSize,
+    );
+
+    // 1. Try Cloudinary Multi-Vault Storage first
     try {
-      final file = File(filePath);
-      final fileName = file.uri.pathSegments.last;
-      final fileSize = await file.length();
-      final uploadId = 'audio_${DateTime.now().millisecondsSinceEpoch}';
-      final uploadService = UploadProgressService();
-      
+      uploadService.updateProgress(
+        id: uploadId,
+        bytesUploaded: fileSize ~/ 2,
+        totalBytes: fileSize,
+      );
+      final cdnUrl = await CloudinaryStorageService.instance.uploadAudio(
+        file: file,
+        folder: 'nexchat-audio',
+      );
+      if (cdnUrl.isNotEmpty) {
+        uploadService.completeUpload(id: uploadId);
+        return cdnUrl;
+      }
+    } catch (e) {
+      debugPrint('[ChatService] Cloudinary audio notice: $e');
+    }
+
+    // 2. Secondary fallback: Firebase Storage
+    try {
       final path = 'audio_messages/$conversationId/$fileName';
-      
-      uploadService.startUpload(
-        id: uploadId,
-        fileName: 'Audio: $fileName',
-        totalBytes: fileSize,
-      );
-
       uploadService.updateProgress(
         id: uploadId,
-        bytesUploaded: fileSize ~/ 3,
+        bytesUploaded: fileSize * 3 ~/ 4,
         totalBytes: fileSize,
       );
-
       await _storage.ref(path).putFile(file);
-      
-      uploadService.updateProgress(
-        id: uploadId,
-        bytesUploaded: fileSize,
-        totalBytes: fileSize,
-      );
-
       uploadService.completeUpload(id: uploadId);
       final url = await _storage.ref(path).getDownloadURL();
       return url;
     } catch (e) {
-      debugPrint('Error uploading audio message: $e');
+      uploadService.failUpload(id: uploadId, error: 'Audio upload failed: $e');
       rethrow;
     }
   }
 
   Future<String> uploadImageMessage(String conversationId, String filePath) async {
+    final file = File(filePath);
+    final fileName = 'img_${DateTime.now().millisecondsSinceEpoch}_${file.uri.pathSegments.last}';
+    final fileSize = await file.length();
+    final uploadId = 'img_${DateTime.now().millisecondsSinceEpoch}';
+    final uploadService = UploadProgressService();
+
+    uploadService.startUpload(
+      id: uploadId,
+      fileName: 'Photo: $fileName',
+      totalBytes: fileSize,
+    );
+
+    // 1. Try Cloudinary Multi-Vault Storage first
     try {
-      final file = File(filePath);
-      final fileName = 'img_${DateTime.now().millisecondsSinceEpoch}_${file.uri.pathSegments.last}';
-      final fileSize = await file.length();
-      final uploadId = 'img_${DateTime.now().millisecondsSinceEpoch}';
-      final uploadService = UploadProgressService();
-
-      final path = 'chat_images/$conversationId/$fileName';
-
-      uploadService.startUpload(
-        id: uploadId,
-        fileName: 'Photo: $fileName',
-        totalBytes: fileSize,
-      );
-
       uploadService.updateProgress(
         id: uploadId,
         bytesUploaded: fileSize ~/ 2,
         totalBytes: fileSize,
       );
+      final cdnUrl = await CloudinaryStorageService.instance.uploadImage(
+        file: file,
+        folder: 'nexchat-chat-images',
+      );
+      if (cdnUrl.isNotEmpty) {
+        uploadService.completeUpload(id: uploadId);
+        return cdnUrl;
+      }
+    } catch (e) {
+      debugPrint('[ChatService] Cloudinary image notice: $e');
+    }
 
-      await _storage.ref(path).putFile(file);
-
+    // 2. Secondary fallback: Firebase Storage
+    try {
+      final path = 'chat_images/$conversationId/$fileName';
       uploadService.updateProgress(
         id: uploadId,
-        bytesUploaded: fileSize,
+        bytesUploaded: fileSize * 3 ~/ 4,
         totalBytes: fileSize,
       );
-
+      await _storage.ref(path).putFile(file);
       uploadService.completeUpload(id: uploadId);
       final url = await _storage.ref(path).getDownloadURL();
       return url;
     } catch (e) {
-      debugPrint('Error uploading chat image: $e');
+      uploadService.failUpload(id: uploadId, error: 'Image upload failed: $e');
       rethrow;
     }
   }
 
   Future<String> uploadFileMessage(String conversationId, String filePath, String originalName) async {
+    final file = File(filePath);
+    final fileName = 'doc_${DateTime.now().millisecondsSinceEpoch}_$originalName';
+    final fileSize = await file.length();
+    final uploadId = 'file_${DateTime.now().millisecondsSinceEpoch}';
+    final uploadService = UploadProgressService();
+
+    uploadService.startUpload(
+      id: uploadId,
+      fileName: originalName,
+      totalBytes: fileSize,
+    );
+
+    // 1. Try Cloudinary Multi-Vault Storage first
     try {
-      final file = File(filePath);
-      final fileName = 'doc_${DateTime.now().millisecondsSinceEpoch}_$originalName';
-      final fileSize = await file.length();
-      final uploadId = 'file_${DateTime.now().millisecondsSinceEpoch}';
-      final uploadService = UploadProgressService();
-
-      final path = 'chat_files/$conversationId/$fileName';
-
-      uploadService.startUpload(
-        id: uploadId,
-        fileName: originalName,
-        totalBytes: fileSize,
-      );
-
       uploadService.updateProgress(
         id: uploadId,
         bytesUploaded: fileSize ~/ 2,
         totalBytes: fileSize,
       );
+      final res = await CloudinaryStorageService.instance.uploadMedia(
+        file: file,
+        fileName: originalName,
+        resourceType: 'auto',
+        folder: 'nexchat-documents',
+      );
+      if (res.secureUrl.isNotEmpty) {
+        uploadService.completeUpload(id: uploadId);
+        return res.secureUrl;
+      }
+    } catch (e) {
+      debugPrint('[ChatService] Cloudinary document notice: $e');
+    }
 
-      await _storage.ref(path).putFile(file);
-
+    // 2. Secondary fallback: Firebase Storage
+    try {
+      final path = 'chat_files/$conversationId/$fileName';
       uploadService.updateProgress(
         id: uploadId,
-        bytesUploaded: fileSize,
+        bytesUploaded: fileSize * 3 ~/ 4,
         totalBytes: fileSize,
       );
-
+      await _storage.ref(path).putFile(file);
       uploadService.completeUpload(id: uploadId);
       final url = await _storage.ref(path).getDownloadURL();
       return url;
     } catch (e) {
-      debugPrint('Error uploading chat file: $e');
+      uploadService.failUpload(id: uploadId, error: 'Document upload failed: $e');
       rethrow;
     }
   }

@@ -59,7 +59,7 @@ class _AboutDevelopersScreenState extends State<AboutDevelopersScreen>
     HapticFeedback.mediumImpact();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('📋 Copied $label to clipboard!'),
+        content: Text('Copied $label to clipboard!'),
         backgroundColor: const Color(0xFF00E5FF),
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),

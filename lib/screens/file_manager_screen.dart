@@ -299,7 +299,7 @@ class _FileManagerScreenState extends State<FileManagerScreen>
           _scanStatusMsg = 'Scanning: $fname';
         });
         await Future<void>.delayed(const Duration(milliseconds: 60));
-        details.add('🛡️ Verified: $fname (Clean)');
+        details.add('[CLEAN] Verified: $fname (Clean)');
       }
     } else {
       for (var i = 0; i < allFiles.length; i++) {
@@ -333,7 +333,7 @@ class _FileManagerScreenState extends State<FileManagerScreen>
           for (final h in heuristics) {
             findings.add(_SecurityFinding(
                 label: fname, reason: h.reason, severity: h.severity, reasoning: h.reasoning));
-            details.add('⚠ ${h.reason}: $fname');
+            details.add('[WARN] ${h.reason}: $fname');
           }
           if (['.exe', '.bat', '.cmd', '.scr'].contains(ext)) {
             findings.add(_SecurityFinding(
@@ -341,15 +341,15 @@ class _FileManagerScreenState extends State<FileManagerScreen>
                 reason: 'Executable file detected',
                 severity: 'High',
                 reasoning: 'Executable-like extension fingerprinted.'));
-            details.add('⛔ Executable: $fname');
+            details.add('[EXEC] Executable: $fname');
           }
           if (sizeMb > 200) {
             findings.add(_SecurityFinding(
                 label: fname, reason: 'Oversized file', severity: 'Low', reasoning: 'Large payload.'));
-            details.add('📦 Large: $fname (${sizeMb.toStringAsFixed(0)} MB)');
+            details.add('[LARGE] Large: $fname (${sizeMb.toStringAsFixed(0)} MB)');
           }
           if (hash.isNotEmpty && hash != 'unavailable') {
-            details.add('🔑 Hash: $hash  →  $fname');
+            details.add('[HASH] $hash  ->  $fname');
           }
         } catch (_) {}
       }

@@ -605,7 +605,7 @@ class _GameDetailScreenState extends State<GameDetailScreen>
             children: [
               Text('SCORE: $_score', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
               if (_combo > 1)
-                Text('${_combo}X COMBO 🔥', style: TextStyle(color: cat.color, fontWeight: FontWeight.w900, fontSize: 11)),
+                Text('${_combo}X COMBO', style: TextStyle(color: cat.color, fontWeight: FontWeight.w900, fontSize: 11)),
             ],
           ),
           // Earned Tokens
@@ -753,7 +753,7 @@ class _GameDetailScreenState extends State<GameDetailScreen>
             ),
             const SizedBox(height: 14),
             Text(
-              _gameWon ? 'MISSION VICTORY! 🏆' : (_gameOver ? 'CRITICAL FAILURE' : cat.name.toUpperCase()),
+              _gameWon ? 'MISSION VICTORY!' : (_gameOver ? 'CRITICAL FAILURE' : cat.name.toUpperCase()),
               style: TextStyle(
                 color: _gameWon ? const Color(0xFFFFD700) : (_gameOver ? Colors.redAccent : Colors.white),
                 fontWeight: FontWeight.w900,

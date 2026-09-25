@@ -3335,7 +3335,7 @@ class _AlienInvasionPainter extends CustomPainter {
       'CLASS-IX EXTIRPATOR MOTHERSHIP DESCENDING',
       'GRAVITATIONAL INVERSION VORTEX ACTIVE',
       'FLEET CANNON FIRE EXCHANGED · ALL DEFENSES ENGAGED',
-      '📡  CYBERNETIC EXTRATERRESTRIAL COMM LINK ESTABLISHED',
+      '  CYBERNETIC EXTRATERRESTRIAL COMM LINK ESTABLISHED',
     ];
 
     final lp = TextPainter(
@@ -3675,7 +3675,7 @@ class _AlienInvasionPainter extends CustomPainter {
     // Power-down city (dark, only faint outlines)
     _drawCitySilhouetteGlow(canvas, size, false, 0);
 
-    _hudLabel(canvas, size, '📡  ALIEN SIGNAL  ·  DECODING IN PROGRESS', const Color(0xFF00FF66));
+    _hudLabel(canvas, size, '  ALIEN SIGNAL  ·  DECODING IN PROGRESS', const Color(0xFF00FF66));
   }
 
   // ─── Shared Drawing Helpers ───

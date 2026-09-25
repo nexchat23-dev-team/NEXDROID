@@ -45,6 +45,7 @@ import 'auto_tracker_screen.dart';
 import 'animation_store_screen.dart';
 import 'battery_saver_screen.dart';
 import 'rust_security_hub_screen.dart';
+import 'admin_dashboard_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -455,6 +456,17 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       iconBuilder: (context) => _buildSearchIcon(),
       routeName: UserSearchScreen.routeName,
       hasDot: false,
+    ),
+    _LauncherApp(
+      id: 'manager_console',
+      title: 'NEX Manager',
+      subtitle: 'Live DB & Cluster Controls',
+      category: 'Tools',
+      iconBuilder: (context) => _buildManagerIcon(),
+      routeName: AdminDashboardScreen.routeName,
+      hasDot: true,
+      dotColor: const Color(0xFF00FF88),
+      badgeText: 'ADMIN',
     ),
     _LauncherApp(
       id: 'settings',
@@ -2261,6 +2273,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       gradientColors: const [Color(0xFF64748B), Color(0xFF334155)],
       child: const Center(
         child: Icon(Icons.settings_rounded, color: Colors.white, size: 28),
+      ),
+    );
+  }
+
+  Widget _buildManagerIcon() {
+    return _buildSquircleContainer(
+      gradientColors: const [Color(0xFF0F2027), Color(0xFF203A43)],
+      border: Border.all(color: const Color(0xFF00FF88).withValues(alpha: 0.6), width: 1.2),
+      child: const Center(
+        child: Icon(Icons.admin_panel_settings_rounded, color: Color(0xFF00FF88), size: 28),
       ),
     );
   }

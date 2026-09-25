@@ -342,7 +342,7 @@ class _AppClonerHubScreenState extends State<AppClonerHubScreen>
     setState(() {
       _clones.remove(entry);
       _saveClones();
-      _logs.add('${_timestamp()} 🗑  ${entry.app.appName} clone deleted');
+      _logs.add('${_timestamp()} [DEL] ${entry.app.appName} clone deleted');
     });
   }
 

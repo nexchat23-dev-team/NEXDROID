@@ -6,17 +6,38 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
+import 'cloudinary_storage_service.dart';
+import 'storage_api_service.dart';
+import 'vercel_blob_service.dart';
 
 class FirebaseService {
   static FirebaseApp? _app;
   static FirebaseDatabase? _realtime;
   static bool _initializationFailed = false;
-  static const String _databaseUrl = 'https://nex-app-63ffb-default-rtdb.firebaseio.com/';
+  static const String _databaseUrl = 'https://nexchat-47326-default-rtdb.firebaseio.com/';
+
+  static const FirebaseOptions nexchatFirebaseOptions = FirebaseOptions(
+    apiKey: 'AIzaSyAoE3QKqT_H9SJ_sYes0wfZdlKG82qRfIk',
+    appId: '1:327330605104:android:ca35cc55624a0e651065f5',
+    messagingSenderId: '327330605104',
+    projectId: 'nexchat-47326',
+    storageBucket: 'nexchat-47326.firebasestorage.app',
+    databaseURL: 'https://nexchat-47326-default-rtdb.firebaseio.com',
+  );
 
   static Future<void> initialize() async {
     if (_initializationFailed) return;
     try {
-      _app ??= await Firebase.initializeApp();
+      if (Firebase.apps.isEmpty) {
+        try {
+          _app = await Firebase.initializeApp();
+        } catch (e) {
+          debugPrint('[FirebaseService] Default init error, using nexchatFirebaseOptions: $e');
+          _app = await Firebase.initializeApp(options: nexchatFirebaseOptions);
+        }
+      } else {
+        _app = Firebase.app();
+      }
       try {
         _realtime ??= FirebaseDatabase.instanceFor(
           app: _app!,
@@ -462,9 +483,56 @@ class FirebaseService {
     required File file,
     required String fileName,
   }) async {
-    final ref = storage.ref().child('avatars').child(uid).child(fileName);
-    await ref.putFile(file);
-    return await ref.getDownloadURL();
+    // 1. Primary: Standalone Storage API Gateway (Vercel Blob Microservice)
+    try {
+      final bytes = await file.readAsBytes();
+      final gatewayUrl = await StorageApiService.instance.uploadProfilePicture(
+        bytes: bytes,
+        userId: uid,
+        fileName: fileName,
+      );
+      if (gatewayUrl != null && gatewayUrl.isNotEmpty) {
+        return gatewayUrl;
+      }
+    } catch (e) {
+      debugPrint('[FirebaseService] Gateway avatar upload notice: $e');
+    }
+
+    // 2. Secondary: Direct Multi-Vault Cloudinary Pipeline
+    try {
+      final cdnUrl = await CloudinaryStorageService.instance.uploadImage(
+        file: file,
+        folder: 'nexchat-avatars',
+      );
+      if (cdnUrl.isNotEmpty) {
+        return cdnUrl;
+      }
+    } catch (e) {
+      debugPrint('[FirebaseService] Cloudinary avatar upload notice: $e');
+    }
+
+    // 3. Tertiary tier: Direct Vercel Blob Profile Vault
+    try {
+      final blobUrl = await VercelBlobService.instance.uploadAvatar(
+        file: file,
+        uid: uid,
+      );
+      if (blobUrl != null && blobUrl.isNotEmpty) {
+        return blobUrl;
+      }
+    } catch (e) {
+      debugPrint('[FirebaseService] Vercel Blob avatar notice: $e');
+    }
+
+    // 4. Final fallback: Firebase Storage
+    try {
+      final ref = storage.ref().child('avatars').child(uid).child(fileName);
+      await ref.putFile(file);
+      return await ref.getDownloadURL();
+    } catch (e) {
+      debugPrint('[FirebaseService] Storage fallback error: $e');
+      rethrow;
+    }
   }
 
   static Future<void> updateProfile({
@@ -477,12 +545,21 @@ class FirebaseService {
     final data = <String, dynamic>{};
     if (displayName != null && displayName.trim().isNotEmpty) {
       data['name'] = displayName.trim();
+      data['displayName'] = displayName.trim();
+      try {
+        await auth.currentUser?.updateDisplayName(displayName.trim());
+      } catch (_) {}
     }
     if (username != null && username.trim().isNotEmpty) {
       data['username'] = username.trim();
     }
     if (photoUrl != null && photoUrl.isNotEmpty) {
       data['photo_url'] = photoUrl;
+      data['profilePic'] = photoUrl;
+      data['profilePicUrl'] = photoUrl;
+      try {
+        await auth.currentUser?.updatePhotoURL(photoUrl);
+      } catch (_) {}
     }
     if (age != null) {
       data['age'] = age;

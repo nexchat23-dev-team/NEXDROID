@@ -141,13 +141,13 @@ class TokenPurchaseService {
         );
 
     return '''
-🔥 NEX TOKEN PURCHASE ORDER 🔥
+[NEX TOKEN PURCHASE ORDER]
 ━━━━━━━━━━━━━━━━━━━━
-👤 User: $username (UID: $shortUid)
-📦 Package: ${packageName ?? 'Custom Token Order'}
-🪙 Token Amount: $formattedTokens Tokens (Rate: 10,000 = \$1.00)
-💵 Price Total: \$${price.toStringAsFixed(2)} USD
-🆔 Order Ref: $orderId
+[USER] $username (UID: $shortUid)
+[PACKAGE] ${packageName ?? 'Custom Token Order'}
+[AMOUNT] $formattedTokens Tokens (Rate: 10,000 = \$1.00)
+[PRICE] \$${price.toStringAsFixed(2)} USD
+[REF] $orderId
 ━━━━━━━━━━━━━━━━━━━━
 Hello @$telegramUsername! I would like to buy $formattedTokens tokens for my NEX account. Please send payment instructions!''';
   }
@@ -170,13 +170,13 @@ Hello @$telegramUsername! I would like to buy $formattedTokens tokens for my NEX
         );
 
     return '''
-💰 NEX TOKEN CASHOUT / SELL ORDER 💰
+[NEX TOKEN CASHOUT / SELL ORDER]
 ━━━━━━━━━━━━━━━━━━━━
-👤 Operative: $username (UID: $shortUid)
-🪙 Tokens to Sell: $formattedTokens Tokens
-💵 Payout Value: \$${payout.toStringAsFixed(2)} USD (Rate: 10,000 = \$1.00)
-💳 Payout Method: ${payoutMethod ?? 'Crypto (USDT/TON) / Bank / PayPal'}
-🆔 Cashout Ref: $orderId
+[OPERATIVE] $username (UID: $shortUid)
+[AMOUNT] $formattedTokens Tokens
+[PAYOUT] \$${payout.toStringAsFixed(2)} USD (Rate: 10,000 = \$1.00)
+[METHOD] ${payoutMethod ?? 'Crypto (USDT/TON) / Bank / PayPal'}
+[REF] $orderId
 ━━━━━━━━━━━━━━━━━━━━
 Hello @$telegramUsername! I would like to sell/cash out $formattedTokens NEX Tokens for \$${payout.toStringAsFixed(2)} USD. Please verify my order and send payout instructions!''';
   }

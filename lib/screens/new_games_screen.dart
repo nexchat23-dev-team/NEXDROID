@@ -69,23 +69,23 @@ class NewGamesScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _buildGameCard(context, "🗡️ Dungeon Crawler",
+          _buildGameCard(context, " Dungeon Crawler",
             "Slash monsters. Survive 5 boss rooms. Earn 150T.",
             [const Color(0xFF7B2FBE), const Color(0xFF3D1066)],
             _kPurple, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DungeonCrawlerGame()))),
-          _buildGameCard(context, "🎯 Stealth Sniper",
+          _buildGameCard(context, " Stealth Sniper",
             "Hold breath. Account for wind. Land the shot. Earn 100T.",
             [const Color(0xFF1A3A1A), const Color(0xFF0A1A0A)],
             _kGreen, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StealthSniperGame()))),
-          _buildGameCard(context, "🏰 Tower Defense",
+          _buildGameCard(context, " Tower Defense",
             "Build laser turrets. Survive 5 waves. +25T per wave.",
             [const Color(0xFF1A2A3A), const Color(0xFF0A1520)],
             _kBlue, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TowerDefenseGame()))),
-          _buildGameCard(context, "🏎️ Street Racer",
+          _buildGameCard(context, " Street Racer",
             "Dodge traffic at 200+ km/h. +10T every 100 score.",
             [const Color(0xFF3A1A00), const Color(0xFF1A0800)],
             _kOrange, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StreetRacerGame()))),
-          _buildGameCard(context, "💎 Cyber Heist",
+          _buildGameCard(context, " Cyber Heist",
             "Infiltrate the vault. Crack 3 safes. Earn 200T.",
             [const Color(0xFF003A3A), const Color(0xFF001A1A)],
             _kBlue, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CyberHeistGame()))),
@@ -370,7 +370,7 @@ class _DungeonCrawlerGameState extends State<DungeonCrawlerGame> with TickerProv
               const SizedBox(width: 12),
               Column(children: [
                 Text('ROOM $_room/5', style: const TextStyle(color: Colors.white60, fontSize: 10, fontWeight: FontWeight.bold)),
-                Text('⚔️ $_gold G', style: const TextStyle(color: _kGold, fontSize: 13, fontWeight: FontWeight.w900)),
+                Text(' $_gold G', style: const TextStyle(color: _kGold, fontSize: 13, fontWeight: FontWeight.w900)),
               ]),
             ]),
           ),
@@ -947,7 +947,7 @@ class _StealthSniperGameState extends State<StealthSniperGame> with TickerProvid
                 boxShadow: [BoxShadow(color: _kGold.withValues(alpha: 0.3), blurRadius: 20)],
               ),
               child: Column(mainAxisSize: MainAxisSize.min, children: [
-                const Text("🎯 MISSION COMPLETE", style: TextStyle(color: _kGold, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                const Text(" MISSION COMPLETE", style: TextStyle(color: _kGold, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 1)),
                 const SizedBox(height: 8),
                 Text("Score: $_score  |  Kills: $_kills/${ _targets.length}", style: const TextStyle(color: Colors.white70, fontSize: 14)),
                 const SizedBox(height: 4),
@@ -1341,18 +1341,18 @@ class _TowerDefenseGameState extends State<TowerDefenseGame> with TickerProvider
               if (_waveClear)
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Text("✅ WAVE $_wave CLEARED! +25T +\$50G  Next wave incoming...",
+                  child: Text(" WAVE $_wave CLEARED! +25T +\$50G  Next wave incoming...",
                     style: const TextStyle(color: _kGold, fontWeight: FontWeight.bold, fontSize: 12)),
                 ),
               if (_gameOver)
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: const Text("⚠️ CORE BREACHED — DEFEAT", style: TextStyle(color: _kRed, fontWeight: FontWeight.w900, fontSize: 14)),
+                  child: const Text(" CORE BREACHED — DEFEAT", style: TextStyle(color: _kRed, fontWeight: FontWeight.w900, fontSize: 14)),
                 ),
               Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-                _towerInfo("⚡ Laser", "50G", _kBlue),
-                _towerInfo("🔥 Flame", "50G", _kOrange),
-                _towerInfo("💜 Arc", "50G", _kPurple),
+                _towerInfo(" Laser", "50G", _kBlue),
+                _towerInfo(" Flame", "50G", _kOrange),
+                _towerInfo(" Arc", "50G", _kPurple),
                 Column(children: [
                   Text("SCORE", style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 10)),
                   Text('$_score', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
@@ -1703,20 +1703,20 @@ class _StreetRacerGameState extends State<StreetRacerGame> with TickerProviderSt
             _score += 150;
             _spawnParticles(_carX, playerY, Colors.yellowAccent, 15);
             GameSoundService().playCoin();
-            _showBanner("💎 +25 TOKENS!");
+            _showBanner(" +25 TOKENS!");
             Provider.of<TokenProvider>(context, listen: false).addTokens(25);
           } else if (t.type == _TrafficType.shield) {
             t.collected = true;
             _hasShield = true;
             _spawnParticles(_carX, playerY, Colors.lightBlueAccent, 20);
             GameSoundService().playWin();
-            _showBanner("🛡️ SHIELD EQUIPPED!");
+            _showBanner(" SHIELD EQUIPPED!");
           } else if (t.type == _TrafficType.nitroCell) {
             t.collected = true;
             _nitro = (_nitro + 40).clamp(0.0, 100.0);
             _spawnParticles(_carX, playerY, Colors.orangeAccent, 15);
             GameSoundService().playLaser();
-            _showBanner("⚡ NITRO OVERCHARGED!");
+            _showBanner(" NITRO OVERCHARGED!");
           } else {
             // Harmful collision (Car / Truck / Police / Mine)
             if (_hasShield) {
@@ -1726,7 +1726,7 @@ class _StreetRacerGameState extends State<StreetRacerGame> with TickerProviderSt
               HapticFeedback.heavyImpact();
               GameSoundService().playExplosion();
               _spawnParticles(_carX, playerY, Colors.lightBlueAccent, 25);
-              _showBanner("🛡️ SHIELD ABSORPTION!");
+              _showBanner(" SHIELD ABSORPTION!");
             } else {
               _gameOver = true;
               _shake = 26;
@@ -1742,7 +1742,7 @@ class _StreetRacerGameState extends State<StreetRacerGame> with TickerProviderSt
             _nearMissCombo++;
             _score += 50 * _nearMissCombo;
             _multiplier = (_nearMissCombo ~/ 3 + 1).clamp(1, 5);
-            _showBanner("🔥 NEAR MISS! x$_multiplier");
+            _showBanner(" NEAR MISS! x$_multiplier");
             _spawnParticles(_carX, playerY, Colors.orange, 4);
           }
         }
@@ -1930,7 +1930,7 @@ class _StreetRacerGameState extends State<StreetRacerGame> with TickerProviderSt
                     Icon(Icons.local_fire_department_rounded, color: _nitroActive ? Colors.cyanAccent : _kOrange, size: 16),
                     const SizedBox(width: 4),
                     Text(
-                      _nitroActive ? "⚡ OVERDRIVE PLASMA ACTIVE" : "NITRO THRUST",
+                      _nitroActive ? " OVERDRIVE PLASMA ACTIVE" : "NITRO THRUST",
                       style: TextStyle(color: _nitroActive ? Colors.cyanAccent : _kOrange, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.2),
                     ),
                   ]),
@@ -1938,7 +1938,7 @@ class _StreetRacerGameState extends State<StreetRacerGame> with TickerProviderSt
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(color: Colors.lightBlueAccent.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.lightBlueAccent)),
-                      child: const Text("🛡️ SHIELD ONLINE", style: TextStyle(color: Colors.lightBlueAccent, fontSize: 10, fontWeight: FontWeight.w900)),
+                      child: const Text(" SHIELD ONLINE", style: TextStyle(color: Colors.lightBlueAccent, fontSize: 10, fontWeight: FontWeight.w900)),
                     ),
                 ],
               ),
@@ -2038,7 +2038,7 @@ class _StreetRacerGameState extends State<StreetRacerGame> with TickerProviderSt
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text("💥 SYSTEM OVERLOAD", style: TextStyle(color: _kRed, fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+                  const Text(" SYSTEM OVERLOAD", style: TextStyle(color: _kRed, fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
                   const SizedBox(height: 12),
                   Text("Final Distance: ${_distance}m  •  Peak Speed: $kmh KM/H", style: const TextStyle(color: Colors.white70, fontSize: 13)),
                   const SizedBox(height: 8),
@@ -2597,7 +2597,7 @@ class _CyberHeistGameState extends State<CyberHeistGame> with TickerProviderStat
       );
       if (safeHit != const Offset(-1, -1) && !_hacked.contains(safeHit)) {
         _hacked.add(safeHit);
-        _hackMsg = 'SAFE CRACKED! 🔓';
+        _hackMsg = 'SAFE CRACKED! ';
         _showHack = true;
         HapticFeedback.mediumImpact();
         GameSoundService().playCoin();
@@ -2667,13 +2667,13 @@ class _CyberHeistGameState extends State<CyberHeistGame> with TickerProviderStat
             Container(
               padding: const EdgeInsets.symmetric(vertical: 12),
               color: _kRed.withValues(alpha: 0.15),
-              child: const Center(child: Text("🚨 BUSTED! SECURITY COMPROMISED", style: TextStyle(color: _kRed, fontWeight: FontWeight.w900, fontSize: 14))),
+              child: const Center(child: Text(" BUSTED! SECURITY COMPROMISED", style: TextStyle(color: _kRed, fontWeight: FontWeight.w900, fontSize: 14))),
             ),
           if (_victory)
             Container(
               padding: const EdgeInsets.symmetric(vertical: 12),
               decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF001A10), Color(0xFF003020)])),
-              child: const Center(child: Text("💎 VAULT CRACKED! +200 TOKENS EARNED!", style: TextStyle(color: _kGold, fontWeight: FontWeight.w900, fontSize: 14))),
+              child: const Center(child: Text(" VAULT CRACKED! +200 TOKENS EARNED!", style: TextStyle(color: _kGold, fontWeight: FontWeight.w900, fontSize: 14))),
             ),
           // D-pad controls
           Container(

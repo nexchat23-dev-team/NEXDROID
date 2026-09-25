@@ -396,7 +396,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> with TickerProvid
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('Successfully purchased & equipped $title! 🎨'),
+                          content: Text('Successfully purchased & equipped $title!'),
                           backgroundColor: kNeonGreen,
                         ),
                       );

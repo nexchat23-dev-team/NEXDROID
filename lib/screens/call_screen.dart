@@ -945,14 +945,14 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
                   scrollDirection: Axis.horizontal,
                   physics: const BouncingScrollPhysics(),
                   children: [
-                    _reactionPill('🔥', 'laser'),
-                    _reactionPill('⚡', 'magic'),
-                    _reactionPill('🛸', 'alien'),
-                    _reactionPill('💎', 'star'),
-                    _reactionPill('🎯', 'laser'),
-                    _reactionPill('🚀', 'hyperspace'),
-                    _reactionPill('💖', 'magic'),
-                    _reactionPill('🤖', 'alien'),
+                    _reactionPill(Icons.local_fire_department_rounded, 'fire', 'laser', const Color(0xFFFF5722)),
+                    _reactionPill(Icons.bolt_rounded, 'bolt', 'magic', const Color(0xFFFFEB3B)),
+                    _reactionPill(Icons.flight_takeoff_rounded, 'ufo', 'alien', const Color(0xFF00E5FF)),
+                    _reactionPill(Icons.diamond_rounded, 'gem', 'star', const Color(0xFF00FF88)),
+                    _reactionPill(Icons.gps_fixed_rounded, 'target', 'laser', const Color(0xFFFF2A6D)),
+                    _reactionPill(Icons.rocket_launch_rounded, 'rocket', 'hyperspace', const Color(0xFFB44FFF)),
+                    _reactionPill(Icons.favorite_rounded, 'heart', 'magic', const Color(0xFFFF4081)),
+                    _reactionPill(Icons.smart_toy_rounded, 'robot', 'alien', const Color(0xFF64FFDA)),
                   ],
                 ),
               ),
@@ -1014,16 +1014,16 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
                           scrollDirection: Axis.horizontal,
                           physics: const BouncingScrollPhysics(),
                           children: [
-                            _lensOptionCard('none', 'Standard', '🔮'),
-                            _lensOptionCard('google_lens', 'Google Lens', '🔍'),
-                            _lensOptionCard('cyber_visor', 'Cyber Visor', '🕶️'),
-                            _lensOptionCard('terminator', 'T-800 Scan', '🤖'),
-                            _lensOptionCard('matrix', 'Matrix Rain', '💻'),
-                            _lensOptionCard('neon_crown', 'Neon Crown', '👑'),
-                            _lensOptionCard('hexagon', 'Hex Shield', '⬡'),
-                            _lensOptionCard('octagon', 'Warship Oct', '🛑'),
-                            _lensOptionCard('diamond', 'Crystal Diamond', '💎'),
-                            _lensOptionCard('cosmic', 'Cosmic Warp', '🌌'),
+                            _lensOptionCard('none', 'Standard', Icons.visibility_rounded),
+                            _lensOptionCard('google_lens', 'Google Lens', Icons.search_rounded),
+                            _lensOptionCard('cyber_visor', 'Cyber Visor', Icons.remove_red_eye_rounded),
+                            _lensOptionCard('terminator', 'T-800 Scan', Icons.smart_toy_rounded),
+                            _lensOptionCard('matrix', 'Matrix Rain', Icons.terminal_rounded),
+                            _lensOptionCard('neon_crown', 'Neon Crown', Icons.shield_rounded),
+                            _lensOptionCard('hexagon', 'Hex Shield', Icons.hexagon_outlined),
+                            _lensOptionCard('octagon', 'Warship Oct', Icons.stop_rounded),
+                            _lensOptionCard('diamond', 'Crystal Diamond', Icons.diamond_rounded),
+                            _lensOptionCard('cosmic', 'Cosmic Warp', Icons.blur_circular_rounded),
                           ],
                         ),
                       ),
@@ -1119,25 +1119,26 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _reactionPill(String emoji, String sound) {
+  Widget _reactionPill(IconData icon, String key, String sound, Color color) {
     return InkWell(
-      onTap: () => _sendReaction(emoji, sound),
+      onTap: () => _sendReaction(key, sound),
       borderRadius: BorderRadius.circular(16),
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
+          color: color.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withValues(alpha: 0.35)),
         ),
         child: Center(
-          child: Text(emoji, style: const TextStyle(fontSize: 20)),
+          child: Icon(icon, color: color, size: 20),
         ),
       ),
     );
   }
 
-  Widget _lensOptionCard(String id, String label, String iconEmoji) {
+  Widget _lensOptionCard(String id, String label, IconData icon) {
     final isSelected = _selectedLens == id;
     return InkWell(
       onTap: () {
@@ -1160,7 +1161,7 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(iconEmoji, style: const TextStyle(fontSize: 22)),
+            Icon(icon, size: 22, color: isSelected ? const Color(0xFF00E5FF) : Colors.white70),
             const SizedBox(height: 3),
             Text(
               label,
@@ -1581,6 +1582,34 @@ class _FloatingStickerData {
     required this.emoji,
     required this.startX,
   });
+
+  static IconData getReactionIcon(String key) {
+    switch (key) {
+      case 'fire':
+      case 'laser':
+        return Icons.local_fire_department_rounded;
+      case 'bolt':
+      case 'magic':
+        return Icons.bolt_rounded;
+      case 'alien':
+      case 'ufo':
+        return Icons.flight_takeoff_rounded;
+      case 'star':
+      case 'gem':
+        return Icons.diamond_rounded;
+      case 'target':
+        return Icons.gps_fixed_rounded;
+      case 'rocket':
+      case 'hyperspace':
+        return Icons.rocket_launch_rounded;
+      case 'heart':
+        return Icons.favorite_rounded;
+      case 'robot':
+        return Icons.smart_toy_rounded;
+      default:
+        return Icons.thumb_up_rounded;
+    }
+  }
 }
 
 class _FloatingStickerWidget extends StatefulWidget {
@@ -1642,7 +1671,11 @@ class _FloatingStickerWidgetState extends State<_FloatingStickerWidget> with Sin
                     ),
                   ],
                 ),
-                child: Text(widget.data.emoji, style: const TextStyle(fontSize: 34)),
+                child: Icon(
+                  _FloatingStickerData.getReactionIcon(widget.data.emoji),
+                  color: const Color(0xFF00E5FF),
+                  size: 34,
+                ),
               ),
             ),
           ),

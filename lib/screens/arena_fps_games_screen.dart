@@ -753,7 +753,7 @@ class _WarzoneBlitzGameState extends State<WarzoneBlitzGame> with TickerProvider
           _buildBar(_health / _maxHealth, kNeonGreen, kNeonRed, 100, 10),
         ]),
         const SizedBox(height: 6),
-        _hudText('GRENADES: $_grenades 💥', kNeonOrange, 13),
+        _hudText('GRENADES: $_grenades', kNeonOrange, 13),
         _hudText('COINS: $_coins', kNeonGold, 13),
         const SizedBox(height: 4),
         _hudText(_currentWeapon.name, _currentWeapon.bulletColor, 14),
@@ -906,25 +906,25 @@ class _WarzoneBlitzGameState extends State<WarzoneBlitzGame> with TickerProvider
       child: SafeArea(child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(children: [
-          Text('⚔️ ARMORY — WAVE ${_wave + 1} PREP', style: TextStyle(
+          Text(' ARMORY — WAVE ${_wave + 1} PREP', style: TextStyle(
             color: kNeonGold, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 3,
             shadows: [Shadow(color: kNeonGold, blurRadius: 15)],
           )),
-          Text('💰 COINS: $_coins', style: const TextStyle(color: Colors.white, fontSize: 16)),
+          Text(' COINS: $_coins', style: const TextStyle(color: Colors.white, fontSize: 16)),
           const SizedBox(height: 16),
           const Text('PERKS', style: TextStyle(color: Colors.white70, fontSize: 14, letterSpacing: 2)),
           const SizedBox(height: 8),
-          _shopPerk('⚡ DOUBLE TAP', 'Fire 40% faster', _perkDoubleTapCost, _perkDoubleTap, () {
+          _shopPerk(' DOUBLE TAP', 'Fire 40% faster', _perkDoubleTapCost, _perkDoubleTap, () {
             if (_coins >= _perkDoubleTapCost && !_perkDoubleTap) {
               setState(() { _coins -= _perkDoubleTapCost; _perkDoubleTap = true; });
             }
           }),
-          _shopPerk('💨 SPEED BOOST', 'Move 50% faster', _perkSpeedBoostCost, _perkSpeedBoost, () {
+          _shopPerk(' SPEED BOOST', 'Move 50% faster', _perkSpeedBoostCost, _perkSpeedBoost, () {
             if (_coins >= _perkSpeedBoostCost && !_perkSpeedBoost) {
               setState(() { _coins -= _perkSpeedBoostCost; _perkSpeedBoost = true; });
             }
           }),
-          _shopPerk('🛡 ARMOR PLATING', 'Reduce damage 30%', _perkArmorPlatingCost, _perkArmorPlating, () {
+          _shopPerk(' ARMOR PLATING', 'Reduce damage 30%', _perkArmorPlatingCost, _perkArmorPlating, () {
             if (_coins >= _perkArmorPlatingCost && !_perkArmorPlating) {
               setState(() { _coins -= _perkArmorPlatingCost; _perkArmorPlating = true; });
             }
@@ -981,14 +981,14 @@ class _WarzoneBlitzGameState extends State<WarzoneBlitzGame> with TickerProvider
           Text(desc, style: const TextStyle(color: Colors.white54, fontSize: 12)),
         ])),
         owned
-            ? const Text('OWNED ✓', style: TextStyle(color: kNeonGreen, fontWeight: FontWeight.bold))
+            ? const Text('OWNED ', style: TextStyle(color: kNeonGreen, fontWeight: FontWeight.bold))
             : ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _coins >= cost ? kNeonGold.withValues(alpha: 0.3) : Colors.white10,
                   side: BorderSide(color: _coins >= cost ? kNeonGold : Colors.white12),
                 ),
                 onPressed: onBuy,
-                child: Text('$cost 💰', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                child: Text('$cost ', style: const TextStyle(color: Colors.white, fontSize: 12)),
               ),
       ]),
     );
@@ -1016,7 +1016,7 @@ class _WarzoneBlitzGameState extends State<WarzoneBlitzGame> with TickerProvider
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             ),
             onPressed: onBuy,
-            child: Text('REFILL $cost💰', style: const TextStyle(color: Colors.white, fontSize: 11)),
+            child: Text('REFILL $cost COINS', style: const TextStyle(color: Colors.white, fontSize: 11)),
           )
         else
           Text('FULL', style: TextStyle(color: kNeonGreen, fontSize: 12, fontWeight: FontWeight.bold)),
@@ -1086,7 +1086,7 @@ class _WarzoneBlitzGameState extends State<WarzoneBlitzGame> with TickerProvider
         Text('KILLS: $_kills', style: const TextStyle(color: Colors.white70, fontSize: 14)),
         if (newRecord) ...[
           const SizedBox(height: 8),
-          Text('🏆 NEW HIGH SCORE!', style: TextStyle(color: kNeonGold, fontSize: 18,
+          Text(' NEW HIGH SCORE!', style: TextStyle(color: kNeonGold, fontSize: 18,
             fontWeight: FontWeight.w900, shadows: [Shadow(color: kNeonGold, blurRadius: 15)])),
         ],
         const SizedBox(height: 24),
@@ -1692,7 +1692,7 @@ class _CyberHuntGameState extends State<CyberHuntGame> with TickerProviderStateM
   }
 
   void _applyHackReward(String reward) {
-    _hackRewardMsg = '✅ HACK SUCCESS: $reward';
+    _hackRewardMsg = ' HACK SUCCESS: $reward';
     _hackRewardTimer = 3.0;
     switch (reward) {
       case 'Matrix Slowdown':
@@ -1787,7 +1787,7 @@ class _CyberHuntGameState extends State<CyberHuntGame> with TickerProviderStateM
             ? Text('RELOADING...', style: TextStyle(color: kNeonYellow, fontSize: 13))
             : Text('AMMO: $_ammo | TOTAL: $_totalAmmo', style: TextStyle(color: _ammo < 5 ? kNeonRed : Colors.white, fontSize: 13)),
         const SizedBox(height: 4),
-        Text(_isZoomed ? '🔭 SCOPE 2x' : '', style: TextStyle(color: kNeonMagenta, fontSize: 12)) ,
+        Text(_isZoomed ? ' SCOPE 2x' : '', style: TextStyle(color: kNeonMagenta, fontSize: 12)) ,
       ])),
     ]);
   }
@@ -1922,7 +1922,7 @@ class _CyberHuntGameState extends State<CyberHuntGame> with TickerProviderStateM
         const SizedBox(height: 16),
         Text('SCORE: $_score', style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
         Text('WAVE: $_wave', style: const TextStyle(color: Colors.white70, fontSize: 16)),
-        if (newRecord) Text('🏆 NEW HIGH SCORE!', style: TextStyle(color: kNeonGold, fontSize: 18,
+        if (newRecord) Text(' NEW HIGH SCORE!', style: TextStyle(color: kNeonGold, fontSize: 18,
           fontWeight: FontWeight.w900, shadows: [Shadow(color: kNeonGold, blurRadius: 15)])),
         const SizedBox(height: 24),
         Row(mainAxisSize: MainAxisSize.min, children: [
@@ -2173,11 +2173,11 @@ class _ZombieSiegeGameState extends State<ZombieSiegeGame> with TickerProviderSt
 
   // Story transmissions
   final List<String> _transmissions = const [
-    '📻 BUNKER 99 LOG DAY 1: "The infected have overrun Sector C. We hold the south gate."',
-    '📻 LOG DAY 4: "Dr. Kira has a working cure formula but needs more time. Hold on, Striker!"',
-    '📻 LOG DAY 8: "Lost contact with Bravo Squad. The Brute horde is 2 clicks out."',
-    '📻 LOG DAY 14: "Cure vials ready. We need you to survive 20 waves. You\'re our last hope."',
-    '📻 LOG DAY 21: "The horde just broke through the east fence. FULL DEFENSE NOW!"',
+    ' BUNKER 99 LOG DAY 1: "The infected have overrun Sector C. We hold the south gate."',
+    ' LOG DAY 4: "Dr. Kira has a working cure formula but needs more time. Hold on, Striker!"',
+    ' LOG DAY 8: "Lost contact with Bravo Squad. The Brute horde is 2 clicks out."',
+    ' LOG DAY 14: "Cure vials ready. We need you to survive 20 waves. You\'re our last hope."',
+    ' LOG DAY 21: "The horde just broke through the east fence. FULL DEFENSE NOW!"',
   ];
   String _currentTransmission = '';
   double _transmissionTimer = 0;
@@ -2625,14 +2625,14 @@ class _ZombieSiegeGameState extends State<ZombieSiegeGame> with TickerProviderSt
             const SizedBox(width: 10),
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('BUNKER 99 SAFEHOUSE', style: TextStyle(color: Colors.green.shade400, fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 2)),
-              Text('WAVE ${_wave + 1} INCOMING | 💰 COINS: $_coins', style: const TextStyle(color: Colors.white60, fontSize: 12)),
+              Text('WAVE ${_wave + 1} INCOMING |  COINS: $_coins', style: const TextStyle(color: Colors.white60, fontSize: 12)),
             ]),
           ])),
         // NPC Tabs
         Row(children: [
-          _safeTab('💊 MEDIC', 0),
-          _safeTab('⚙️ MECHANIC', 1),
-          _safeTab('🎖 COMMANDER', 2),
+          _safeTab(' MEDIC', 0),
+          _safeTab(' MECHANIC', 1),
+          _safeTab(' COMMANDER', 2),
         ]),
         Expanded(child: SingleChildScrollView(padding: const EdgeInsets.all(16), child: _buildSafeTab())),
         Padding(padding: const EdgeInsets.all(12), child: ElevatedButton.icon(
@@ -2674,13 +2674,13 @@ class _ZombieSiegeGameState extends State<ZombieSiegeGame> with TickerProviderSt
           const SizedBox(height: 6),
           Text('"Stay alive out there. I\'m working on the cure..."', style: TextStyle(color: Colors.green.shade700, fontStyle: FontStyle.italic)),
           const SizedBox(height: 16),
-          _sfBtn('🩹 Medkit (+30 HP)', medicKitCost: _medicKitCost, onBuy: () {
+          _sfBtn(' Medkit (+30 HP)', medicKitCost: _medicKitCost, onBuy: () {
             if (_coins >= _medicKitCost) { setState(() { _coins -= _medicKitCost; _health = (_health + 30).clamp(0, _maxHealth); _medicKitCost += 20; }); }
           }),
-          _sfBtn('❤️ Max Health Upgrade (+20 Max HP)', medicKitCost: 150, onBuy: () {
+          _sfBtn(' Max Health Upgrade (+20 Max HP)', medicKitCost: 150, onBuy: () {
             if (_coins >= 150) { setState(() { _coins -= 150; _maxHealth += 20; _health = _maxHealth; }); }
           }),
-          _sfBtn('🧪 Adrenaline Shot (Fill all ammo)', medicKitCost: 200, onBuy: () {
+          _sfBtn(' Adrenaline Shot (Fill all ammo)', medicKitCost: 200, onBuy: () {
             if (_coins >= 200) { setState(() { _coins -= 200; _arAmmo = 30; _arTotal = 180; _sgAmmo = 8; _sgTotal = 48; }); }
           }),
         ]);
@@ -2691,14 +2691,14 @@ class _ZombieSiegeGameState extends State<ZombieSiegeGame> with TickerProviderSt
           const SizedBox(height: 6),
           Text('"I can boost your firepower or build defense hardware."', style: TextStyle(color: Colors.orange.shade800, fontStyle: FontStyle.italic)),
           const SizedBox(height: 16),
-          _sfBtn('⚡ AR Damage Upgrade (+1 dmg)', medicKitCost: _weaponUpCost(), onBuy: () {
+          _sfBtn(' AR Damage Upgrade (+1 dmg)', medicKitCost: _weaponUpCost(), onBuy: () {
             if (_coins >= _weaponUpCost()) { setState(() { _coins -= _weaponUpCost(); _arDmg += 1; }); }
           }),
-          _sfBtn('💥 Shotgun Damage Upgrade (+2 dmg)', medicKitCost: _weaponUpCost() + 30, onBuy: () {
+          _sfBtn(' Shotgun Damage Upgrade (+2 dmg)', medicKitCost: _weaponUpCost() + 30, onBuy: () {
             int cost = _weaponUpCost() + 30;
             if (_coins >= cost) { setState(() { _coins -= cost; _sgDmg += 2; }); }
           }),
-          _sfBtn('🤖 Build Auto-Sentry Turret', medicKitCost: _sentryBuildCost, onBuy: () {
+          _sfBtn(' Build Auto-Sentry Turret', medicKitCost: _sentryBuildCost, onBuy: () {
             if (_coins >= _sentryBuildCost && _sentries.length < 4) {
               setState(() { _coins -= _sentryBuildCost; _sentries.add(ZsSentry(x: 0.2 + _sentries.length * 0.2)); _sentryBuildCost += 50; });
             }
@@ -2713,15 +2713,15 @@ class _ZombieSiegeGameState extends State<ZombieSiegeGame> with TickerProviderSt
           const SizedBox(height: 6),
           Text('"We have to hold the perimeter. Fortify everything!"', style: TextStyle(color: Colors.blue.shade800, fontStyle: FontStyle.italic)),
           const SizedBox(height: 16),
-          _sfBtn('🪵 Build Barricade', medicKitCost: _barricadeCost, onBuy: () {
+          _sfBtn(' Build Barricade', medicKitCost: _barricadeCost, onBuy: () {
             if (_coins >= _barricadeCost && _barricades.length < 5) {
               setState(() { _coins -= _barricadeCost; _barricades.add(ZsBarricade(x: 0.1 + _barricades.length * 0.18, hp: 8)); _barricadeCost += 30; });
             }
           }),
-          _sfBtn('🔧 Repair Barricades (restore HP)', medicKitCost: 60, onBuy: () {
+          _sfBtn(' Repair Barricades (restore HP)', medicKitCost: 60, onBuy: () {
             if (_coins >= 60) { setState(() { _coins -= 60; for (var b in _barricades) b.hp = 8; }); }
           }),
-          _sfBtn('📢 Call Reinforcements (kill 3 zombies)', medicKitCost: 120, onBuy: () {
+          _sfBtn(' Call Reinforcements (kill 3 zombies)', medicKitCost: 120, onBuy: () {
             if (_coins >= 120) {
               int killed = 0;
               setState(() {
@@ -2755,7 +2755,7 @@ class _ZombieSiegeGameState extends State<ZombieSiegeGame> with TickerProviderSt
       onPressed: canAfford ? onBuy : null,
       child: Row(children: [
         Expanded(child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 13))),
-        Text('$medicKitCost 💰', style: TextStyle(color: canAfford ? kNeonGold : Colors.white38, fontWeight: FontWeight.bold)),
+        Text('$medicKitCost ', style: TextStyle(color: canAfford ? kNeonGold : Colors.white38, fontWeight: FontWeight.bold)),
       ]),
     ));
   }
@@ -2806,7 +2806,7 @@ class _ZombieSiegeGameState extends State<ZombieSiegeGame> with TickerProviderSt
         Text('SCORE: $_score', style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
         Text('WAVE REACHED: $_wave', style: const TextStyle(color: Colors.white70, fontSize: 16)),
         Text('KILLS: $_kills', style: const TextStyle(color: Colors.white54, fontSize: 14)),
-        if (newRecord) Text('🏆 NEW HIGH SCORE!', style: TextStyle(color: kNeonGold, fontSize: 18,
+        if (newRecord) Text(' NEW HIGH SCORE!', style: TextStyle(color: kNeonGold, fontSize: 18,
           fontWeight: FontWeight.w900, shadows: [Shadow(color: kNeonGold, blurRadius: 15)])),
         const SizedBox(height: 24),
         Row(mainAxisSize: MainAxisSize.min, children: [
