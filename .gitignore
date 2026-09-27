@@ -126,3 +126,5 @@ flutter_analyze_output.txt
 deps.txt
 outdated.json
 windows/flutter/ephemeral/
+# Widget Preview related
+.widget_preview/

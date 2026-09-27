@@ -50,7 +50,7 @@ dependencies:
   url_launcher: ^6.1.10
   geolocator: ^14.0.3
   sensors_plus: ^7.1.0
-  intl: 0.20.2
+  intl: ^0.20.3
 
 dev_dependencies:
   flutter_test:

@@ -1,92 +1,33 @@
 import 'dart:async';
-import 'dart:math';
-import 'dart:ui' as ui;
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
-/// Hyper-Realistic 3D Cosmic Particle & Physics Entities
+// ============================================================================
+// LIGHTWEIGHT 3D VECTOR FOR HARDWARE-ACCELERATED HOLOGRAPHIC RENDERING
+// ============================================================================
 
-class Star3D {
-  double x;
-  double y;
-  double z;
-  double prevZ;
-  double radius;
-  Color color;
-  double pulsePhase;
-  double pulseSpeed;
+class _Vec3D {
+  double x, y, z;
+  _Vec3D(this.x, this.y, this.z);
 
-  Star3D({
-    required this.x,
-    required this.y,
-    required this.z,
-    required this.prevZ,
-    required this.radius,
-    required this.color,
-    required this.pulsePhase,
-    required this.pulseSpeed,
-  });
+  _Vec3D rotateX(double a) {
+    final c = math.cos(a), s = math.sin(a);
+    return _Vec3D(x, y * c - z * s, y * s + z * c);
+  }
+
+  _Vec3D rotateY(double a) {
+    final c = math.cos(a), s = math.sin(a);
+    return _Vec3D(x * c + z * s, y, -x * s + z * c);
+  }
+
+  _Vec3D rotateZ(double a) {
+    final c = math.cos(a), s = math.sin(a);
+    return _Vec3D(x * c - y * s, x * s + y * c, z);
+  }
 }
 
-class ShootingStar3D {
-  double x;
-  double y;
-  double z;
-  double vx;
-  double vy;
-  double vz;
-  double length;
-  double radius;
-  double life;
-  double maxLife;
-  Color coreColor;
-  Color tailColor;
-  List<Offset> prevScreenPositions = [];
-  List<double> prevZDepths = [];
-
-  ShootingStar3D({
-    required this.x,
-    required this.y,
-    required this.z,
-    required this.vx,
-    required this.vy,
-    required this.vz,
-    required this.length,
-    required this.radius,
-    required this.life,
-    required this.maxLife,
-    required this.coreColor,
-    required this.tailColor,
-  });
-}
-
-class Ember3D {
-  double x;
-  double y;
-  double z;
-  double vx;
-  double vy;
-  double vz;
-  double radius;
-  double life;
-  double maxLife;
-  Color color;
-
-  Ember3D({
-    required this.x,
-    required this.y,
-    required this.z,
-    required this.vx,
-    required this.vy,
-    required this.vz,
-    required this.radius,
-    required this.life,
-    required this.maxLife,
-    required this.color,
-  });
-}
-
-/// Photorealistic 3D Space Loading Animation Component
+/// Military-Grade Tactical Holographic 3D Loading Component
 class Realistic3DCosmicLoadingWidget extends StatefulWidget {
   final String statusText;
   final double progress; // 0.0 to 1.0, null for indeterminate
@@ -95,39 +36,42 @@ class Realistic3DCosmicLoadingWidget extends StatefulWidget {
 
   const Realistic3DCosmicLoadingWidget({
     super.key,
-    this.statusText = 'INITIALIZING 3D QUANTUM CORE...',
+    this.statusText = 'SYSTEM INITIALIZING // QUANTUM CORE ARMED',
     this.progress = 0.5,
     this.isWarping = false,
     this.onComplete,
   });
 
   @override
-  State<Realistic3DCosmicLoadingWidget> createState() => _Realistic3DCosmicLoadingWidgetState();
+  State<Realistic3DCosmicLoadingWidget> createState() =>
+      _Realistic3DCosmicLoadingWidgetState();
 }
 
-class _Realistic3DCosmicLoadingWidgetState extends State<Realistic3DCosmicLoadingWidget>
+class _Realistic3DCosmicLoadingWidgetState
+    extends State<Realistic3DCosmicLoadingWidget>
     with SingleTickerProviderStateMixin {
   late final AnimationController _tickerCtrl;
-  final Random _rnd = Random();
+  final math.Random _rnd = math.Random(42);
 
-  // 3D Physics World
-  final List<Star3D> _stars = [];
-  final List<ShootingStar3D> _shootingStars = [];
-  final List<Ember3D> _embers = [];
+  // 3D Particles
+  final List<_Vec3D> _deepStars = [];
+  final List<double> _starSpeeds = [];
 
   // Gyro / Tilt Camera Physics
   StreamSubscription<AccelerometerEvent>? _accelSub;
   Offset _tiltOffset = Offset.zero;
   Offset _smoothedTilt = Offset.zero;
 
-  // Accretion Disk / Black Hole Rotation
-  double _blackHoleAngle = 0.0;
-  double _shootingStarTimer = 0.0;
+  // 3D Gyroscope Gimbal Angles
+  double _angleX = 0.0;
+  double _angleY = 0.0;
+  double _angleZ = 0.0;
+  int _tickCount = 0;
 
   @override
   void initState() {
     super.initState();
-    _init3DStarfield();
+    _init3DEnvironment();
     _setupSensors();
 
     _tickerCtrl = AnimationController(
@@ -135,158 +79,58 @@ class _Realistic3DCosmicLoadingWidgetState extends State<Realistic3DCosmicLoadin
       duration: const Duration(seconds: 1),
     )..repeat();
 
-    _tickerCtrl.addListener(_update3DPhysics);
+    _tickerCtrl.addListener(_updatePhysics);
   }
 
-  void _init3DStarfield() {
-    _stars.clear();
-    for (int i = 0; i < 220; i++) {
-      final double z = 10.0 + _rnd.nextDouble() * 990.0;
-      final colorRoll = _rnd.nextDouble();
-      Color c;
-      if (colorRoll > 0.85) {
-        c = const Color(0xFF00E5FF); // Electric Cyan
-      } else if (colorRoll > 0.70) {
-        c = const Color(0xFFC084FC); // Quantum Purple
-      } else if (colorRoll > 0.55) {
-        c = const Color(0xFFFFD700); // Solar Gold
-      } else {
-        c = Colors.white;
-      }
-
-      _stars.add(Star3D(
-        x: (_rnd.nextDouble() - 0.5) * 1600.0,
-        y: (_rnd.nextDouble() - 0.5) * 1600.0,
-        z: z,
-        prevZ: z,
-        radius: 0.8 + _rnd.nextDouble() * 2.2,
-        color: c,
-        pulsePhase: _rnd.nextDouble() * pi * 2,
-        pulseSpeed: 1.5 + _rnd.nextDouble() * 3.5,
+  void _init3DEnvironment() {
+    _deepStars.clear();
+    _starSpeeds.clear();
+    for (int i = 0; i < 180; i++) {
+      _deepStars.add(_Vec3D(
+        (_rnd.nextDouble() - 0.5) * 1200.0,
+        (_rnd.nextDouble() - 0.5) * 1200.0,
+        100.0 + _rnd.nextDouble() * 900.0,
       ));
+      _starSpeeds.add(0.8 + _rnd.nextDouble() * 2.2);
     }
   }
 
   void _setupSensors() {
     _accelSub = accelerometerEventStream().listen((event) {
       if (!mounted) return;
-      final rawX = -event.x * 12.0;
-      final rawY = event.y * 12.0;
+      final rawX = -event.x * 6.0;
+      final rawY = event.y * 6.0;
       setState(() {
         _tiltOffset = Offset(rawX, rawY);
       });
     }, onError: (_) {});
   }
 
-  void _spawnShootingStar() {
-    final startZ = 200.0 + _rnd.nextDouble() * 400.0;
-    final angle = _rnd.nextDouble() * pi * 2;
-    final speed = 18.0 + _rnd.nextDouble() * 22.0;
-
-    final colorRoll = _rnd.nextDouble();
-    Color coreColor = colorRoll > 0.5 ? const Color(0xFF00E5FF) : const Color(0xFFFF2A85);
-    Color tailColor = colorRoll > 0.5 ? const Color(0xFF3B82F6) : const Color(0xFF9333EA);
-
-    _shootingStars.add(ShootingStar3D(
-      x: cos(angle) * (300.0 + _rnd.nextDouble() * 200.0),
-      y: sin(angle) * (300.0 + _rnd.nextDouble() * 200.0),
-      z: startZ,
-      vx: -cos(angle + 0.3) * speed,
-      vy: -sin(angle + 0.3) * speed,
-      vz: -speed * 0.8,
-      length: 120.0 + _rnd.nextDouble() * 100.0,
-      radius: 2.5 + _rnd.nextDouble() * 1.5,
-      life: 0.0,
-      maxLife: 1.2 + _rnd.nextDouble() * 0.8,
-      coreColor: coreColor,
-      tailColor: tailColor,
-    ));
-  }
-
-  void _update3DPhysics() {
+  void _updatePhysics() {
     if (!mounted) return;
+    _tickCount++;
 
-    // Smooth gyro camera interpolation
+    // Smooth gyro camera interpolation with critical damping
     _smoothedTilt = Offset(
       _smoothedTilt.dx + (_tiltOffset.dx - _smoothedTilt.dx) * 0.08,
       _smoothedTilt.dy + (_tiltOffset.dy - _smoothedTilt.dy) * 0.08,
     );
 
-    _blackHoleAngle += 0.025;
-    _shootingStarTimer += 0.016;
+    // Continuous 3D Gyroscope Gimbal Rotations
+    final speed = widget.isWarping ? 0.08 : 0.02;
+    _angleX += speed * 0.7;
+    _angleY += speed * 1.0;
+    _angleZ += speed * 0.5;
 
-    if (_shootingStarTimer > 0.8) {
-      _shootingStarTimer = 0.0;
-      if (_shootingStars.length < 4) {
-        _spawnShootingStar();
-      }
-    }
-
-    final double speedFactor = widget.isWarping ? 18.0 : 2.5;
-
-    // 1. Update 3D Stars
-    for (final star in _stars) {
-      star.prevZ = star.z;
-      star.z -= speedFactor;
-      star.pulsePhase += 0.02 * star.pulseSpeed;
-
-      // Wrap around when star flies past camera
-      if (star.z <= 5.0) {
-        star.z = 1000.0;
-        star.prevZ = 1000.0;
-        star.x = (_rnd.nextDouble() - 0.5) * 1600.0;
-        star.y = (_rnd.nextDouble() - 0.5) * 1600.0;
-      }
-    }
-
-    // 2. Update 3D Shooting Stars
-    for (int i = _shootingStars.length - 1; i >= 0; i--) {
-      final ss = _shootingStars[i];
-      ss.life += 0.016;
-
-      // Add to position history for 3D volumetric trail
-      ss.prevScreenPositions.add(Offset(ss.x, ss.y));
-      ss.prevZDepths.add(ss.z);
-      if (ss.prevScreenPositions.length > 12) {
-        ss.prevScreenPositions.removeAt(0);
-        ss.prevZDepths.removeAt(0);
-      }
-
-      ss.x += ss.vx;
-      ss.y += ss.vy;
-      ss.z += ss.vz;
-
-      // Spawn trail embers
-      if (_rnd.nextDouble() > 0.4) {
-        _embers.add(Ember3D(
-          x: ss.x + (_rnd.nextDouble() - 0.5) * 15.0,
-          y: ss.y + (_rnd.nextDouble() - 0.5) * 15.0,
-          z: ss.z,
-          vx: ss.vx * 0.2 + (_rnd.nextDouble() - 0.5) * 4.0,
-          vy: ss.vy * 0.2 + (_rnd.nextDouble() - 0.5) * 4.0,
-          vz: ss.vz * 0.2,
-          radius: 1.0 + _rnd.nextDouble() * 1.5,
-          life: 0.0,
-          maxLife: 0.4 + _rnd.nextDouble() * 0.4,
-          color: ss.coreColor,
-        ));
-      }
-
-      if (ss.life >= ss.maxLife || ss.z <= 10.0) {
-        _shootingStars.removeAt(i);
-      }
-    }
-
-    // 3. Update 3D Embers
-    for (int i = _embers.length - 1; i >= 0; i--) {
-      final e = _embers[i];
-      e.life += 0.016;
-      e.x += e.vx;
-      e.y += e.vy;
-      e.z += e.vz;
-
-      if (e.life >= e.maxLife || e.z <= 5.0) {
-        _embers.removeAt(i);
+    // Advance 3D Starfield
+    final starWarpSpeed = widget.isWarping ? 18.0 : 2.0;
+    for (int i = 0; i < _deepStars.length; i++) {
+      final s = _deepStars[i];
+      s.z -= _starSpeeds[i] * starWarpSpeed;
+      if (s.z <= 10.0) {
+        s.z = 1000.0;
+        s.x = (_rnd.nextDouble() - 0.5) * 1200.0;
+        s.y = (_rnd.nextDouble() - 0.5) * 1200.0;
       }
     }
 
@@ -302,109 +146,174 @@ class _Realistic3DCosmicLoadingWidgetState extends State<Realistic3DCosmicLoadin
 
   @override
   Widget build(BuildContext context) {
+    final progressVal = widget.progress.clamp(0.0, 1.0);
+    final percentInt = (progressVal * 100).toInt();
+
     return Stack(
       children: [
-        // 3D Canvas Visualizer
+        // 1. Hardware 3D Hologram Canvas
         Positioned.fill(
           child: CustomPaint(
-            painter: _Realistic3DCosmicPainter(
-              stars: _stars,
-              shootingStars: _shootingStars,
-              embers: _embers,
+            painter: _TacticalHologram3DPainter(
+              deepStars: _deepStars,
               tiltOffset: _smoothedTilt,
-              blackHoleAngle: _blackHoleAngle,
+              angleX: _angleX,
+              angleY: _angleY,
+              angleZ: _angleZ,
               isWarping: widget.isWarping,
+              progress: progressVal,
+              tick: _tickCount,
             ),
           ),
         ),
 
-        // Cyber / Quantum Loading Overlay HUD
+        // 2. High-Precision Tactical HUD Telemetry
         Align(
           alignment: Alignment.bottomCenter,
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 60.0, left: 32.0, right: 32.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Status message with glowing cyan border box
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF030712).withValues(alpha: 0.8),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: const Color(0xFF00E5FF).withValues(alpha: 0.6),
-                      width: 1.5,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF00E5FF).withValues(alpha: 0.25),
-                        blurRadius: 18,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 28.0, left: 24.0, right: 24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Top Diagnostic Telemetry Strip
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.0,
-                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00E5FF)),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        widget.statusText,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.5,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 18),
-
-                // Quantum 3D Progress Bar
-                Container(
-                  height: 6,
-                  width: double.infinity,
-                  constraints: const BoxConstraints(maxWidth: 340),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: FractionallySizedBox(
-                    alignment: Alignment.centerLeft,
-                    widthFactor: widget.progress.clamp(0.05, 1.0),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [
-                            Color(0xFF00E5FF),
-                            Color(0xFF8B5CF6),
-                            Color(0xFFFF2A85),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(10),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF00E5FF).withValues(alpha: 0.8),
-                            blurRadius: 12,
-                            spreadRadius: 1,
+                      Row(
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Color(0xFF00FF88),
+                              boxShadow: [
+                                BoxShadow(color: Color(0xFF00FF88), blurRadius: 8),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'SYS::LIVE // LATENCY: 0.8ms',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.6),
+                              fontSize: 10,
+                              fontFamily: 'monospace',
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.2,
+                            ),
                           ),
                         ],
                       ),
+                      Text(
+                        '0x7F${(percentInt * 255 ~/ 100).toRadixString(16).padLeft(2, '0').toUpperCase()} // READY',
+                        style: TextStyle(
+                          color: const Color(0xFF00E5FF).withValues(alpha: 0.8),
+                          fontSize: 10,
+                          fontFamily: 'monospace',
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Status Console Box
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF070B16).withValues(alpha: 0.85),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFF00E5FF).withValues(alpha: 0.25),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        // Scanning Reticle Glyph
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: const Color(0xFF00E5FF).withValues(alpha: 0.5),
+                              width: 1.2,
+                            ),
+                          ),
+                          child: Center(
+                            child: Container(
+                              width: 6,
+                              height: 6,
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Color(0xFF00E5FF),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            widget.statusText.toUpperCase(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.3,
+                              fontFamily: 'monospace',
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Text(
+                          '$percentInt%',
+                          style: const TextStyle(
+                            color: Color(0xFF00FF88),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 12),
+
+                  // Industrial Segmented Laser Gauge
+                  Row(
+                    children: List.generate(24, (index) {
+                      final segProgress = (index + 1) / 24.0;
+                      final isActive = progressVal >= segProgress;
+                      return Expanded(
+                        child: Container(
+                          height: 4,
+                          margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                          decoration: BoxDecoration(
+                            color: isActive
+                                ? const Color(0xFF00E5FF)
+                                : Colors.white.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(2),
+                            boxShadow: isActive
+                                ? [
+                                    BoxShadow(
+                                      color: const Color(0xFF00E5FF).withValues(alpha: 0.6),
+                                      blurRadius: 4,
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -413,214 +322,289 @@ class _Realistic3DCosmicLoadingWidgetState extends State<Realistic3DCosmicLoadin
   }
 }
 
-/// Hardware-Accelerated 3D Custom Painter
-class _Realistic3DCosmicPainter extends CustomPainter {
-  final List<Star3D> stars;
-  final List<ShootingStar3D> shootingStars;
-  final List<Ember3D> embers;
-  final Offset tiltOffset;
-  final double blackHoleAngle;
-  final bool isWarping;
+// ============================================================================
+// HARDWARE-ACCELERATED MILITARY 3D HOLOGRAPHIC PAINTER
+// ============================================================================
 
-  _Realistic3DCosmicPainter({
-    required this.stars,
-    required this.shootingStars,
-    required this.embers,
+class _TacticalHologram3DPainter extends CustomPainter {
+  final List<_Vec3D> deepStars;
+  final Offset tiltOffset;
+  final double angleX, angleY, angleZ;
+  final bool isWarping;
+  final double progress;
+  final int tick;
+
+  _TacticalHologram3DPainter({
+    required this.deepStars,
     required this.tiltOffset,
-    required this.blackHoleAngle,
+    required this.angleX,
+    required this.angleY,
+    required this.angleZ,
     required this.isWarping,
+    required this.progress,
+    required this.tick,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final double focalLength = size.width * 0.85;
-    final Offset center = Offset(size.width / 2 + tiltOffset.dx, size.height / 2 + tiltOffset.dy);
+    final cx = size.width / 2 + tiltOffset.dx;
+    final cy = size.height * 0.44 + tiltOffset.dy;
+    final center = Offset(cx, cy);
 
-    // Deep cosmic space background gradient
-    final bgPaint = Paint()
-      ..shader = ui.Gradient.radial(
-        center,
-        size.width * 0.9,
-        [
-          const Color(0xFF090D24),
-          const Color(0xFF040612),
-          const Color(0xFF020206),
-        ],
-      );
+    // Deep Void Obsidian Background
+    final bgPaint = Paint()..color = const Color(0xFF03050C);
     canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), bgPaint);
 
-    // 1. Draw 3D Gravitational Singularity Core & Accretion Lensing Ring
-    _draw3DAccretionDisk(canvas, center, size);
+    // 1. Perspective 3D Infinite Grid Floor
+    _draw3DGridFloor(canvas, size, center);
 
-    // 2. Draw 3D Stars with Perspective Motion Streaks
-    for (final star in stars) {
-      if (star.z <= 1.0) continue;
+    // 2. 3D Stars / Depth Data Stream
+    _draw3DStarStream(canvas, size, center);
 
-      final double scale = focalLength / star.z;
-      final double sx = center.dx + star.x * scale;
-      final double sy = center.dy + star.y * scale;
+    // 3. Central Holographic 3D Gyroscope Gimbal Rings
+    _draw3DGimbalRings(canvas, center, size.width * 0.32);
 
-      if (sx < -20 || sx > size.width + 20 || sy < -20 || sy > size.height + 20) continue;
+    // 4. Central 3D Floating Polyhedral Core (Icosahedron / Quantum Crystal)
+    _draw3DQuantumPolyhedron(canvas, center, size.width * 0.14);
 
-      // Distance fog & pulse opacity
-      final double normZ = (1000.0 - star.z).clamp(0.0, 1000.0) / 1000.0;
-      final double pulse = (sin(star.pulsePhase) + 1.0) / 2.0;
-      final double alpha = (0.2 + 0.8 * normZ * (0.7 + 0.3 * pulse)).clamp(0.0, 1.0);
-      final double renderRadius = (star.radius * scale * 1.8).clamp(0.6, 6.5);
+    // 5. Targeting Radar Sweep Ring
+    _drawRadarSweep(canvas, center, size.width * 0.36);
+  }
 
-      if (isWarping) {
-        // Warp motion stretch line
-        final double prevScale = focalLength / star.prevZ;
-        final double psx = center.dx + star.x * prevScale;
-        final double psy = center.dy + star.y * prevScale;
+  void _draw3DGridFloor(Canvas canvas, Size size, Offset center) {
+    final floorY = size.height * 0.65;
+    final gridPaint = Paint()
+      ..color = const Color(0xFF00E5FF).withValues(alpha: 0.05)
+      ..strokeWidth = 1.0;
 
-        final warpLinePaint = Paint()
-          ..color = star.color.withValues(alpha: alpha)
-          ..strokeWidth = renderRadius
-          ..strokeCap = StrokeCap.round;
+    // Horizon Line
+    canvas.drawLine(
+      Offset(0, floorY),
+      Offset(size.width, floorY),
+      Paint()
+        ..color = const Color(0xFF00E5FF).withValues(alpha: 0.15)
+        ..strokeWidth = 1.2,
+    );
 
-        canvas.drawLine(Offset(psx, psy), Offset(sx, sy), warpLinePaint);
-      } else {
-        // Soft glowing star point
-        final starPaint = Paint()..color = star.color.withValues(alpha: alpha);
-        canvas.drawCircle(Offset(sx, sy), renderRadius, starPaint);
-
-        if (renderRadius > 2.5) {
-          final glowPaint = Paint()
-            ..color = star.color.withValues(alpha: alpha * 0.35)
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0);
-          canvas.drawCircle(Offset(sx, sy), renderRadius * 2.2, glowPaint);
-        }
-      }
+    // Vanishing Point Grid Rays
+    const numRays = 16;
+    for (int i = 0; i <= numRays; i++) {
+      final bottomX = (size.width / numRays) * i;
+      canvas.drawLine(Offset(center.dx, floorY), Offset(bottomX, size.height), gridPaint);
     }
 
-    // 3. Draw 3D Volumetric Shooting Stars
-    for (final ss in shootingStars) {
-      if (ss.z <= 1.0) continue;
-
-      final double scale = focalLength / ss.z;
-      final double sx = center.dx + ss.x * scale;
-      final double sy = center.dy + ss.y * scale;
-
-      // Draw Volumetric Trail from previous 3D positions
-      if (ss.prevScreenPositions.isNotEmpty) {
-        for (int i = 0; i < ss.prevScreenPositions.length - 1; i++) {
-          final double pZ = ss.prevZDepths[i];
-          final double pScale = focalLength / pZ;
-          final Offset p1 = Offset(
-            center.dx + ss.prevScreenPositions[i].dx * pScale,
-            center.dy + ss.prevScreenPositions[i].dy * pScale,
-          );
-          final Offset p2 = Offset(
-            center.dx + ss.prevScreenPositions[i + 1].dx * (focalLength / ss.prevZDepths[i + 1]),
-            center.dy + ss.prevScreenPositions[i + 1].dy * (focalLength / ss.prevZDepths[i + 1]),
-          );
-
-          final double trailProgress = i / ss.prevScreenPositions.length;
-          final double trailAlpha = (trailProgress * (1.0 - ss.life / ss.maxLife)).clamp(0.0, 1.0);
-
-          final trailPaint = Paint()
-            ..shader = ui.Gradient.linear(
-              p1,
-              p2,
-              [
-                ss.tailColor.withValues(alpha: 0.0),
-                ss.coreColor.withValues(alpha: trailAlpha),
-              ],
-            )
-            ..strokeWidth = (ss.radius * scale * 2.2 * trailProgress).clamp(1.0, 8.0)
-            ..strokeCap = StrokeCap.round;
-
-          canvas.drawLine(p1, p2, trailPaint);
-        }
-      }
-
-      // Shooting star plasma head flare
-      final headPaint = Paint()..color = Colors.white;
-      canvas.drawCircle(Offset(sx, sy), ss.radius * scale * 2.0, headPaint);
-
-      final headGlow = Paint()
-        ..color = ss.coreColor.withValues(alpha: 0.9)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8.0);
-      canvas.drawCircle(Offset(sx, sy), ss.radius * scale * 4.5, headGlow);
-    }
-
-    // 4. Draw 3D Spark Embers
-    for (final e in embers) {
-      if (e.z <= 1.0) continue;
-      final double scale = focalLength / e.z;
-      final double sx = center.dx + e.x * scale;
-      final double sy = center.dy + e.y * scale;
-      final double alpha = (1.0 - e.life / e.maxLife).clamp(0.0, 1.0);
-
-      final emberPaint = Paint()..color = e.color.withValues(alpha: alpha);
-      canvas.drawCircle(Offset(sx, sy), (e.radius * scale).clamp(0.8, 3.5), emberPaint);
+    // Depth-Receding Transverse Lines
+    for (double z = 1.0; z <= 6.0; z += 1.0) {
+      final y = floorY + (size.height - floorY) * math.pow(z / 6.0, 1.8);
+      final alpha = (0.02 + (z / 6.0) * 0.07).clamp(0.0, 1.0);
+      canvas.drawLine(
+        Offset(0, y),
+        Offset(size.width, y),
+        Paint()
+          ..color = const Color(0xFF00E5FF).withValues(alpha: alpha)
+          ..strokeWidth = 0.8,
+      );
     }
   }
 
-  /// Interstellar-Style 3D Accretion Disk around Black Hole Void
-  void _draw3DAccretionDisk(Canvas canvas, Offset center, Size size) {
-    final double radius = size.width * 0.28;
+  void _draw3DStarStream(Canvas canvas, Size size, Offset center) {
+    const focalLength = 400.0;
+    final starPaint = Paint()..strokeCap = StrokeCap.round;
 
-    // Outer Einstein Gravitational Lensing Glow
-    final lensPaint = Paint()
-      ..shader = ui.Gradient.sweep(
-        center,
-        [
-          const Color(0xFF00E5FF).withValues(alpha: 0.15),
-          const Color(0xFF8B5CF6).withValues(alpha: 0.35),
-          const Color(0xFFFF2A85).withValues(alpha: 0.20),
-          const Color(0xFF00E5FF).withValues(alpha: 0.15),
-        ],
-        null,
-        TileMode.clamp,
-        blackHoleAngle,
-        blackHoleAngle + pi * 2,
-      )
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 24.0);
+    for (final s in deepStars) {
+      if (s.z <= 10.0) continue;
+      final scale = focalLength / s.z;
+      final px = center.dx + s.x * scale;
+      final py = center.dy + s.y * scale;
 
-    canvas.drawCircle(center, radius * 1.35, lensPaint);
+      if (px < -10 || px > size.width + 10 || py < -10 || py > size.height + 10) continue;
 
-    // Relativistic Doppler Accretion Ring Ellipse
-    canvas.save();
-    canvas.translate(center.dx, center.dy);
-    canvas.rotate(0.35); // 3D Perspective Tilt Angle
+      final normZ = (1000.0 - s.z) / 1000.0;
+      final alpha = (normZ * 0.7).clamp(0.05, 0.8);
+      starPaint
+        ..color = const Color(0xFF00E5FF).withValues(alpha: alpha)
+        ..strokeWidth = (scale * 2.2).clamp(0.8, 4.0);
 
-    final Rect diskRect = Rect.fromCenter(center: Offset.zero, width: radius * 2.4, height: radius * 0.7);
+      canvas.drawCircle(Offset(px, py), starPaint.strokeWidth * 0.5, starPaint);
+    }
+  }
 
-    final diskPaint = Paint()
-      ..shader = ui.Gradient.sweep(
-        Offset.zero,
-        [
-          const Color(0xFF00E5FF).withValues(alpha: 0.85), // Oncoming blue-shifted gas
-          const Color(0xFF8B5CF6).withValues(alpha: 0.65),
-          const Color(0xFFFF2A85).withValues(alpha: 0.35), // Receding red-shifted gas
-          const Color(0xFF00E5FF).withValues(alpha: 0.85),
-        ],
-        null,
-        TileMode.clamp,
-        blackHoleAngle * 1.5,
-        blackHoleAngle * 1.5 + pi * 2,
-      )
+  void _draw3DGimbalRings(Canvas canvas, Offset center, double radius) {
+    const numPoints = 36;
+
+    // Ring 1: Outer Primary Gimbal (Rotates on X & Y)
+    _render3DRing(
+      canvas,
+      center,
+      radius: radius,
+      rotX: angleX,
+      rotY: angleY,
+      rotZ: 0,
+      color: const Color(0xFF00E5FF),
+      strokeWidth: 1.4,
+      dashAlpha: 0.75,
+      numPoints: numPoints,
+    );
+
+    // Ring 2: Intermediate Gimbal (Counter-rotates on Y & Z)
+    _render3DRing(
+      canvas,
+      center,
+      radius: radius * 0.82,
+      rotX: 0,
+      rotY: -angleY * 1.2,
+      rotZ: angleZ,
+      color: const Color(0xFF00FF88),
+      strokeWidth: 1.2,
+      dashAlpha: 0.65,
+      numPoints: numPoints,
+    );
+
+    // Ring 3: Inner Core Ring (Rotates on X & Z)
+    _render3DRing(
+      canvas,
+      center,
+      radius: radius * 0.64,
+      rotX: angleX * 1.4,
+      rotY: 0,
+      rotZ: -angleZ * 0.8,
+      color: const Color(0xFF7000FF),
+      strokeWidth: 1.0,
+      dashAlpha: 0.5,
+      numPoints: numPoints,
+    );
+  }
+
+  void _render3DRing(
+    Canvas canvas,
+    Offset center, {
+    required double radius,
+    required double rotX,
+    required double rotY,
+    required double rotZ,
+    required Color color,
+    required double strokeWidth,
+    required double dashAlpha,
+    required int numPoints,
+  }) {
+    const focal = 350.0;
+    const cameraDist = 450.0;
+    final List<Offset> projected = [];
+    final List<double> depths = [];
+
+    for (int i = 0; i <= numPoints; i++) {
+      final theta = (i / numPoints) * math.pi * 2;
+      final raw = _Vec3D(radius * math.cos(theta), radius * math.sin(theta), 0.0);
+      final rotated = raw.rotateX(rotX).rotateY(rotY).rotateZ(rotZ);
+
+      final z = rotated.z + cameraDist;
+      final scale = focal / z;
+      projected.add(Offset(center.dx + rotated.x * scale, center.dy + rotated.y * scale));
+      depths.add(rotated.z);
+    }
+
+    final path = Path()..moveTo(projected[0].dx, projected[0].dy);
+    for (int i = 1; i < projected.length; i++) {
+      path.lineTo(projected[i].dx, projected[i].dy);
+    }
+
+    // Depth-aware glow paint
+    final ringPaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 14.0
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6.0);
+      ..strokeWidth = strokeWidth
+      ..color = color.withValues(alpha: dashAlpha);
 
-    canvas.drawOval(diskRect, diskPaint);
-    canvas.restore();
+    canvas.drawPath(path, ringPaint);
+  }
 
-    // Event Horizon Core Void (Black Hole Center)
-    final voidPaint = Paint()..color = const Color(0xFF010104);
-    canvas.drawCircle(center, radius * 0.52, voidPaint);
+  void _draw3DQuantumPolyhedron(Canvas canvas, Offset center, double size) {
+    const focal = 350.0;
+    const cameraDist = 450.0;
 
-    final eventHorizonBorder = Paint()
-      ..color = const Color(0xFF00E5FF).withValues(alpha: 0.9)
+    // 3D Octahedron Vertices
+    final vertices = [
+      _Vec3D(0, -size, 0),  // Top
+      _Vec3D(size, 0, 0),   // Right
+      _Vec3D(0, 0, size),   // Front
+      _Vec3D(-size, 0, 0),  // Left
+      _Vec3D(0, 0, -size),  // Back
+      _Vec3D(0, size, 0),   // Bottom
+    ];
+
+    // Rotated vertices
+    final transformed = vertices.map((v) {
+      return v.rotateX(angleX * 1.5).rotateY(angleY * 2.0).rotateZ(angleZ * 0.8);
+    }).toList();
+
+    // Projected to 2D
+    final projected = transformed.map((v) {
+      final z = v.z + cameraDist;
+      final scale = focal / z;
+      return Offset(center.dx + v.x * scale, center.dy + v.y * scale);
+    }).toList();
+
+    // Octahedron Edges (12 edges)
+    const edges = [
+      [0, 1], [0, 2], [0, 3], [0, 4], // Top to equator
+      [5, 1], [5, 2], [5, 3], [5, 4], // Bottom to equator
+      [1, 2], [2, 3], [3, 4], [4, 1], // Equator ring
+    ];
+
+    final edgePaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.2
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
-    canvas.drawCircle(center, radius * 0.53, eventHorizonBorder);
+      ..strokeWidth = 1.5
+      ..color = const Color(0xFF00E5FF).withValues(alpha: 0.85);
+
+    for (final e in edges) {
+      final p1 = projected[e[0]];
+      final p2 = projected[e[1]];
+      canvas.drawLine(p1, p2, edgePaint);
+    }
+
+    // Glowing Core Node
+    final coreGlow = Paint()
+      ..color = const Color(0xFF00FF88).withValues(alpha: 0.4)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14);
+    canvas.drawCircle(center, 12.0, coreGlow);
+    canvas.drawCircle(center, 4.0, Paint()..color = Colors.white);
+  }
+
+  void _drawRadarSweep(Canvas canvas, Offset center, double radius) {
+    final sweepAngle = (tick * 0.04) % (math.pi * 2);
+
+    final radarPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0
+      ..color = const Color(0xFF00E5FF).withValues(alpha: 0.12);
+
+    canvas.drawCircle(center, radius, radarPaint);
+
+    // Crosshairs
+    canvas.drawLine(
+      Offset(center.dx - radius * 1.1, center.dy),
+      Offset(center.dx + radius * 1.1, center.dy),
+      Paint()..color = const Color(0xFF00E5FF).withValues(alpha: 0.08)..strokeWidth = 0.8,
+    );
+    canvas.drawLine(
+      Offset(center.dx, center.dy - radius * 1.1),
+      Offset(center.dx, center.dy + radius * 1.1),
+      Paint()..color = const Color(0xFF00E5FF).withValues(alpha: 0.08)..strokeWidth = 0.8,
+    );
+
+    // Rotating Sweep Line
+    final sweepEnd = Offset(
+      center.dx + math.cos(sweepAngle) * radius,
+      center.dy + math.sin(sweepAngle) * radius,
+    );
+    canvas.drawLine(
+      center,
+      sweepEnd,
+      Paint()
+        ..color = const Color(0xFF00E5FF).withValues(alpha: 0.4)
+        ..strokeWidth = 1.4,
+    );
   }
 
   @override
-  bool shouldRepaint(covariant _Realistic3DCosmicPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _TacticalHologram3DPainter old) => true;
 }
