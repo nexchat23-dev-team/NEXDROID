@@ -135,16 +135,27 @@ class _RegisterScreenState extends State<RegisterScreen>
       ));
 
       if (authService.user?.emailVerified == false) {
-        ScaffoldMessenger.of(context).showMaterialBanner(
-          MaterialBanner(
-            content: const Text('Please verify your email address.', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
-            backgroundColor: Colors.yellowAccent,
-            actions: [
-              TextButton(
-                onPressed: () => ScaffoldMessenger.of(context).hideCurrentMaterialBanner(),
-                child: const Text('DISMISS', style: TextStyle(color: Colors.black)),
-              ),
-            ],
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.mark_email_unread_rounded, color: Color(0xFF00E5FF), size: 20),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Verification link sent. Please verify your email.',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFF0C1026),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: Color(0xFF00E5FF), width: 1),
+            ),
+            duration: const Duration(seconds: 4),
           ),
         );
       }

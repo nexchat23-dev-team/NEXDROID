@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -75,10 +74,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   late final AnimationController _animationController;
   Timer? _shootingStarTimer;
-  int _shootingStarColorIndex = 0;
+  final ValueNotifier<int> _shootingStarColorNotifier = ValueNotifier<int>(0);
   StreamSubscription? _gyroSub;
-  double _gyroX = 0;
-  double _gyroY = 0;
+  final ValueNotifier<Offset> _gyroNotifier = ValueNotifier<Offset>(Offset.zero);
 
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -479,17 +477,20 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     ),
   ];
 
+  bool _dismissedEmailVerification = false;
+
   @override
   void initState() {
     super.initState();
     _animationController = AnimationController(vsync: this, duration: const Duration(seconds: 16))..repeat(reverse: true);
     _shootingStarTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       if (!mounted) return;
-      setState(() {
-        _shootingStarColorIndex = (_shootingStarColorIndex + 1) % _shootingStarColors.length;
-      });
+      _shootingStarColorNotifier.value = (_shootingStarColorNotifier.value + 1) % _shootingStarColors.length;
     });
     _startGyro();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ScaffoldMessenger.of(context).clearMaterialBanners();
+    });
   }
 
   DateTime _lastGyroUpdate = DateTime.now();
@@ -498,17 +499,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _gyroSub = accelerometerEventStream().listen((event) {
       if (!mounted) return;
       final now = DateTime.now();
-      if (now.difference(_lastGyroUpdate).inMilliseconds < 120) return;
+      if (now.difference(_lastGyroUpdate).inMilliseconds < 180) return;
 
       final newX = (event.x / 10).clamp(-1.0, 1.0);
       final newY = (event.y / 10).clamp(-1.0, 1.0);
 
-      if ((newX - _gyroX).abs() > 0.04 || (newY - _gyroY).abs() > 0.04) {
+      if ((newX - _gyroNotifier.value.dx).abs() > 0.08 || (newY - _gyroNotifier.value.dy).abs() > 0.08) {
         _lastGyroUpdate = now;
-        setState(() {
-          _gyroX = newX;
-          _gyroY = newY;
-        });
+        _gyroNotifier.value = Offset(newX, newY);
       }
     }, onError: (_) {});
   }
@@ -518,6 +516,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _gyroSub?.cancel();
     _animationController.dispose();
     _shootingStarTimer?.cancel();
+    _shootingStarColorNotifier.dispose();
+    _gyroNotifier.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -582,58 +582,72 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final quickAccessIds = {'profile', 'nex_chat', 'gaming_hub', 'ai_chat', 'predictions'};
     final quickAccessApps = _launcherApps.where((a) => quickAccessIds.contains(a.id)).toList();
 
-    return AnimatedBuilder(
-      animation: userLeveling,
-      builder: (context, _) {
-        return Scaffold(
-          backgroundColor: const Color(0xFF02040A),
-          body: Stack(
-            children: [
-              // ── 1. Live Animated Sci-Fi Background ──────────────────────────────
-              Positioned.fill(
-                child: equippedHomeId == 'classic_aurora'
-                    ? AnimatedBuilder(
-                        animation: _animationController,
-                        builder: (context, _) {
-                          return CustomPaint(
-                            painter: _HomeBackgroundPainter(
-                              isDark: isDark,
-                              animationValue: _animationController.value,
-                              shootingStarColor: _shootingStarColors[_shootingStarColorIndex],
-                            ),
-                          );
-                        },
-                      )
-                    : buildSciFiAnimation(equippedHomeId, gyroX: _gyroX, gyroY: _gyroY),
-              ),
+    return Scaffold(
+      backgroundColor: const Color(0xFF02040A),
+      body: Stack(
+        children: [
+          // ── 1. Live Animated Sci-Fi Background (Isolated Layer) ───────────
+          Positioned.fill(
+            child: RepaintBoundary(
+              child: equippedHomeId == 'classic_aurora'
+                  ? AnimatedBuilder(
+                      animation: Listenable.merge([_animationController, _shootingStarColorNotifier]),
+                      builder: (context, _) {
+                        return CustomPaint(
+                          painter: _HomeBackgroundPainter(
+                            isDark: isDark,
+                            animationValue: _animationController.value,
+                            shootingStarColor: _shootingStarColors[_shootingStarColorNotifier.value],
+                          ),
+                        );
+                      },
+                    )
+                  : ValueListenableBuilder<Offset>(
+                      valueListenable: _gyroNotifier,
+                      builder: (context, gyroOffset, _) {
+                        return buildSciFiAnimation(equippedHomeId, gyroX: gyroOffset.dx, gyroY: gyroOffset.dy);
+                      },
+                    ),
+            ),
+          ),
 
-              // ── 2. Cinematic Scrim Overlay ──────────────────────────────────────
-              Positioned.fill(
-                child: Container(
-                  color: Colors.black.withValues(alpha: isDark ? 0.42 : 0.25),
-                ),
-              ),
+          // ── 2. Cinematic Scrim Overlay ──────────────────────────────────────
+          Positioned.fill(
+            child: Container(
+              color: Colors.black.withValues(alpha: isDark ? 0.42 : 0.25),
+            ),
+          ),
 
-              // ── 3. Scrollable Dashboard Body ────────────────────────────────────
-              SafeArea(
-                bottom: false,
-                child: CustomScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  slivers: [
-                    // ── A. Header & Search Command Bar ────────────────────────────
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Top Operative Command Bar
-                            _buildTopStatusBar(user, userLeveling, tokenProvider),
+          // ── 3. Scrollable Dashboard Body ────────────────────────────────────
+          SafeArea(
+            bottom: false,
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                // ── A. Header & Search Command Bar ────────────────────────────
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Top Operative Command Bar & Greeting (Scoped Leveling Rebuilds)
+                        AnimatedBuilder(
+                          animation: userLeveling,
+                          builder: (context, _) => Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildTopStatusBar(user, userLeveling, tokenProvider),
+                              const SizedBox(height: 12),
+                              _buildOperativeGreetingHeader(user, userLeveling),
+                            ],
+                          ),
+                        ),
 
-                            const SizedBox(height: 12),
-
-                            // Greeting & System Status
-                            _buildOperativeGreetingHeader(user, userLeveling),
+                            if (user != null && user.emailVerified == false && !_dismissedEmailVerification) ...[
+                              const SizedBox(height: 10),
+                              _buildEmailVerificationNotice(user),
+                            ],
 
                             const SizedBox(height: 10),
 
@@ -983,158 +997,152 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 left: 0,
                 right: 0,
                 bottom: 0,
-                child: _buildFrostedLauncherDock(isDark),
+                child: RepaintBoundary(
+                  child: _buildFrostedLauncherDock(isDark),
+                ),
               ),
             ],
           ),
         );
-      },
-    );
   }
 
   // ── Top Operative Command Status Bar ─────────────────────────────────────────
   Widget _buildTopStatusBar(dynamic user, UserLevelingService leveling, token_provider.TokenProvider tokenProvider) {
-    return Row(
-      children: [
-        // App Logo & OS Brand
-        const Expanded(
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: DynamicMorphingLogoWidget(
-              size: 34,
-              showText: true,
-            ),
+    return SizedBox(
+      height: 44,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Sleek Cyber Logo & Brand
+          const DynamicMorphingLogoWidget(
+            size: 32,
+            showText: true,
           ),
-        ),
 
-        const SizedBox(width: 6),
-
-        // Daily Bonus Streak & Token Balance Chip
-        InkWell(
-          onTap: () {
-            setState(() => _showWidgetPanel = !_showWidgetPanel);
-            HapticFeedback.selectionClick();
-            GameSoundService().playTick();
-          },
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.55),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFFF9800).withValues(alpha: 0.45)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.local_fire_department_rounded, color: Color(0xFFFF9800), size: 16),
-                const SizedBox(width: 4),
-                Text(
-                  '${tokenProvider.streakCount}d',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11.5),
-                ),
-                const SizedBox(width: 6),
-                Container(width: 1, height: 12, color: Colors.white24),
-                const SizedBox(width: 6),
-                const Icon(Icons.monetization_on_rounded, color: Color(0xFFFFD700), size: 14),
-                const SizedBox(width: 3),
-                Text(
-                  '${tokenProvider.balance}',
-                  style: const TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.w900, fontSize: 11.5),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        const SizedBox(width: 8),
-
-        // Operative Profile & Live Milestone Avatar Chip
-        InkWell(
-          onTap: () {
-            GameSoundService().playHoloEngage();
-            HapticFeedback.selectionClick();
-            Navigator.pushNamed(context, ProfileScreen.routeName);
-          },
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0C1026).withValues(alpha: 0.85),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: leveling.rankColor.withValues(alpha: 0.6), width: 1.2),
-              boxShadow: [
-                BoxShadow(
-                  color: leveling.rankColor.withValues(alpha: 0.25),
-                  blurRadius: 10,
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 26,
-                  height: 26,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: leveling.rankColor, width: 1.5),
-                  ),
-                  child: ClipOval(
-                    child: leveling.activeMilestoneAvatarAsset != null
-                        ? Image.asset(leveling.activeMilestoneAvatarAsset!, fit: BoxFit.cover)
-                        : (user?.photoURL != null && user!.photoURL!.isNotEmpty
-                            ? Image.network(user.photoURL!, fit: BoxFit.cover)
-                            : Container(
-                                color: leveling.rankColor,
-                                child: const Icon(Icons.person_rounded, color: Colors.black, size: 16),
-                              )),
-                  ),
-                ),
-                const SizedBox(width: 5),
-                Text(
-                  'LVL ${leveling.currentLevel}',
-                  style: TextStyle(
-                    color: leveling.rankColor,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 11,
-                    letterSpacing: 0.6,
-                  ),
-                ),
-                const SizedBox(width: 4),
-              ],
-            ),
-          ),
-        ),
-
-        const SizedBox(width: 8),
-
-        // Quick Settings Button
-        ClipRRect(
-          borderRadius: BorderRadius.circular(14),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-              ),
-              child: IconButton(
-                padding: const EdgeInsets.all(7),
-                constraints: const BoxConstraints(),
-                onPressed: () {
+          // Aligned Status HUD Controls
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Daily Bonus Streak & Token Balance Chip
+              InkWell(
+                onTap: () {
+                  setState(() => _showWidgetPanel = !_showWidgetPanel);
                   HapticFeedback.selectionClick();
                   GameSoundService().playTick();
-                  Navigator.pushNamed(context, SettingsScreen.routeName);
                 },
-                icon: const Icon(Icons.settings_rounded, color: Colors.white, size: 19),
-                tooltip: 'Settings & Backgrounds',
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.65),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFFF9800).withValues(alpha: 0.45)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.local_fire_department_rounded, color: Color(0xFFFF9800), size: 14),
+                      const SizedBox(width: 3),
+                      Text(
+                        '${tokenProvider.streakCount}d',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11),
+                      ),
+                      const SizedBox(width: 5),
+                      Container(width: 1, height: 10, color: Colors.white24),
+                      const SizedBox(width: 5),
+                      const Icon(Icons.monetization_on_rounded, color: Color(0xFFFFD700), size: 13),
+                      const SizedBox(width: 3),
+                      Text(
+                        '${tokenProvider.balance}',
+                        style: const TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.w900, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
+
+              const SizedBox(width: 6),
+
+              // Operative Level Badge
+              InkWell(
+                onTap: () {
+                  GameSoundService().playHoloEngage();
+                  HapticFeedback.selectionClick();
+                  Navigator.pushNamed(context, ProfileScreen.routeName);
+                },
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0C1026).withValues(alpha: 0.85),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: leveling.rankColor.withValues(alpha: 0.6), width: 1.2),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 20,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: leveling.rankColor, width: 1.2),
+                        ),
+                        child: ClipOval(
+                          child: leveling.activeMilestoneAvatarAsset != null
+                              ? Image.asset(leveling.activeMilestoneAvatarAsset!, fit: BoxFit.cover)
+                              : (user?.photoURL != null && user!.photoURL!.isNotEmpty
+                                  ? Image.network(user.photoURL!, fit: BoxFit.cover)
+                                  : Container(
+                                      color: leveling.rankColor,
+                                      child: const Icon(Icons.person_rounded, color: Colors.black, size: 13),
+                                    )),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'LVL ${leveling.currentLevel}',
+                        style: TextStyle(
+                          color: leveling.rankColor,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 10,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: 6),
+
+              // Quick Settings Button
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+                  ),
+                  child: IconButton(
+                    padding: const EdgeInsets.all(6),
+                    constraints: const BoxConstraints(),
+                    onPressed: () {
+                      HapticFeedback.selectionClick();
+                      GameSoundService().playTick();
+                      Navigator.pushNamed(context, SettingsScreen.routeName);
+                    },
+                    icon: const Icon(Icons.settings_rounded, color: Colors.white, size: 18),
+                    tooltip: 'Settings',
+                  ),
+                ),
+              ),
+            ],
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -1239,58 +1247,187 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  // ── Cyber Search Bar ───────────────────────────────────────────────────────
-  Widget _buildLauncherSearchBar() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-        child: Container(
-          height: 44,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.18), width: 1.1),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.25),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
+  // ── Email Verification Notice Banner (Dark Cyber Theme - Zero Yellow) ─────
+  Widget _buildEmailVerificationNotice(dynamic user) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0C1226),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF00E5FF).withValues(alpha: 0.35),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF00E5FF).withValues(alpha: 0.1),
+            blurRadius: 10,
           ),
-          child: Row(
-            children: [
-              const Icon(Icons.search_rounded, color: Color(0xFF00E5FF), size: 19),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (val) => setState(() => _searchQuery = val),
-                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                  decoration: const InputDecoration(
-                    hintText: 'Search modules, games, clans, tools...',
-                    hintStyle: TextStyle(color: Colors.white54, fontSize: 12.5),
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: EdgeInsets.zero,
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: const Color(0xFF00E5FF).withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.4)),
+            ),
+            child: const Icon(Icons.mark_email_unread_rounded, color: Color(0xFF00E5FF), size: 18),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'EMAIL VERIFICATION PENDING',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 11.5,
+                    letterSpacing: 0.5,
                   ),
                 ),
-              ),
-              if (_searchQuery.isNotEmpty)
-                GestureDetector(
-                  onTap: () {
-                    _searchController.clear();
-                    setState(() => _searchQuery = '');
-                  },
-                  child: const Icon(Icons.close_rounded, color: Colors.white70, size: 18),
-                )
-              else
-                const Icon(Icons.tune_rounded, color: Colors.white38, size: 18),
-            ],
+                const SizedBox(height: 2),
+                const Text(
+                  'Please verify your email address to unlock full operative features.',
+                  style: TextStyle(color: Colors.white70, fontSize: 11),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    InkWell(
+                      onTap: () async {
+                        try {
+                          await user.sendEmailVerification();
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Verification link sent to ${user.email}'),
+                              backgroundColor: const Color(0xFF0C1026),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        } catch (e) {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Notice: $e'),
+                              backgroundColor: const Color(0xFF0C1026),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      },
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 2, horizontal: 4),
+                        child: Text(
+                          'RESEND LINK',
+                          style: TextStyle(
+                            color: Color(0xFF00E5FF),
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    InkWell(
+                      onTap: () async {
+                        try {
+                          await user.reload();
+                          if (!mounted) return;
+                          setState(() {});
+                          if (user.emailVerified == true) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Email verified! Operative credentials active.'),
+                                backgroundColor: Color(0xFF0C1026),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        } catch (_) {}
+                      },
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 2, horizontal: 4),
+                        child: Text(
+                          'CHECK STATUS',
+                          style: TextStyle(
+                            color: Color(0xFF00FF88),
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
+          IconButton(
+            onPressed: () => setState(() => _dismissedEmailVerification = true),
+            icon: const Icon(Icons.close_rounded, color: Colors.white38, size: 16),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Cyber Search Bar ───────────────────────────────────────────────────────
+  Widget _buildLauncherSearchBar() {
+    return Container(
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xE60D1226),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16), width: 1.1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.search_rounded, color: Color(0xFF00E5FF), size: 19),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              onChanged: (val) => setState(() => _searchQuery = val),
+              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+              decoration: const InputDecoration(
+                hintText: 'Search modules, games, clans, tools...',
+                hintStyle: TextStyle(color: Colors.white54, fontSize: 12.5),
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ),
+          if (_searchQuery.isNotEmpty)
+            GestureDetector(
+              onTap: () {
+                _searchController.clear();
+                setState(() => _searchQuery = '');
+              },
+              child: const Icon(Icons.close_rounded, color: Colors.white70, size: 18),
+            )
+          else
+            const Icon(Icons.tune_rounded, color: Colors.white38, size: 18),
+        ],
       ),
     );
   }
@@ -1407,72 +1544,66 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   // ── Expandable Daily Streak & Stats Panel ──────────────────────────────────
   Widget _buildStreakAndStatsWidget(token_provider.TokenProvider tokenProvider) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF161934), Color(0xFF0F1225)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.35)),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
-                blurRadius: 16,
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFF9800).withValues(alpha: 0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.local_fire_department_rounded, color: Color(0xFFFF9800), size: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${tokenProvider.streakCount} DAY STREAK ACTIVE',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.6),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      tokenProvider.hasCheckedInToday ? 'Daily bounty claimed! Keep it burning tomorrow.' : 'Claim today’s bonus tokens to maintain streak.',
-                      style: const TextStyle(color: Colors.white70, fontSize: 10.5),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              ElevatedButton(
-                onPressed: tokenProvider.hasCheckedInToday ? null : _handleDailyCheckIn,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00E5FF),
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  elevation: 4,
-                ),
-                child: Text(
-                  tokenProvider.hasCheckedInToday ? 'CLAIMED' : 'CHECK IN',
-                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 10.5, letterSpacing: 0.6),
-                ),
-              ),
-            ],
-          ),
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF161934), Color(0xFF0F1225)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.35)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
+            blurRadius: 16,
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF9800).withValues(alpha: 0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.local_fire_department_rounded, color: Color(0xFFFF9800), size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${tokenProvider.streakCount} DAY STREAK ACTIVE',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.6),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  tokenProvider.hasCheckedInToday ? 'Daily bounty claimed! Keep it burning tomorrow.' : 'Claim today’s bonus tokens to maintain streak.',
+                  style: const TextStyle(color: Colors.white70, fontSize: 10.5),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          ElevatedButton(
+            onPressed: tokenProvider.hasCheckedInToday ? null : _handleDailyCheckIn,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00E5FF),
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              elevation: 4,
+            ),
+            child: Text(
+              tokenProvider.hasCheckedInToday ? 'CLAIMED' : 'CHECK IN',
+              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 10.5, letterSpacing: 0.6),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1875,70 +2006,62 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
     return Container(
       margin: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding > 0 ? bottomPadding + 6 : 16),
-      child: ClipRRect(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xF5090D1E),
         borderRadius: BorderRadius.circular(26),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF090D1E).withValues(alpha: 0.82),
-              borderRadius: BorderRadius.circular(26),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 1.2),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.5),
-                  blurRadius: 24,
-                  offset: const Offset(0, 8),
-                ),
-                BoxShadow(
-                  color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
-                  blurRadius: 18,
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                // 1. NEX Chat with Badge
-                _buildDockIcon(
-                  builder: () => _buildNexChatIcon(),
-                  label: 'Chat',
-                  onTap: () => Navigator.pushNamed(context, ConversationsListScreen.routeName),
-                  badge: '99+',
-                ),
-
-                // 2. Gaming Hub
-                _buildDockIcon(
-                  builder: () => _buildGamingHubIcon(),
-                  label: 'Games',
-                  onTap: () => Navigator.pushNamed(context, GamingHubScreen.routeName),
-                ),
-
-                // 3. NEX AI
-                _buildDockIcon(
-                  builder: () => _buildNexAiIcon(),
-                  label: 'AI Brain',
-                  onTap: () => Navigator.pushNamed(context, AIChatScreen.routeName),
-                ),
-
-                // 4. Marketplace
-                _buildDockIcon(
-                  builder: () => _buildMarketplaceIcon(),
-                  label: 'Store',
-                  onTap: () => Navigator.pushNamed(context, MarketplaceScreen.routeName),
-                ),
-
-                // 5. Settings
-                _buildDockIcon(
-                  builder: () => _buildSettingsIcon(),
-                  label: 'Settings',
-                  onTap: () => Navigator.pushNamed(context, SettingsScreen.routeName),
-                ),
-              ],
-            ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.5),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
           ),
-        ),
+          BoxShadow(
+            color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
+            blurRadius: 18,
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          // 1. NEX Chat with Badge
+          _buildDockIcon(
+            builder: () => _buildNexChatIcon(),
+            label: 'Chat',
+            onTap: () => Navigator.pushNamed(context, ConversationsListScreen.routeName),
+            badge: '99+',
+          ),
+
+          // 2. Gaming Hub
+          _buildDockIcon(
+            builder: () => _buildGamingHubIcon(),
+            label: 'Games',
+            onTap: () => Navigator.pushNamed(context, GamingHubScreen.routeName),
+          ),
+
+          // 3. NEX AI
+          _buildDockIcon(
+            builder: () => _buildNexAiIcon(),
+            label: 'AI Brain',
+            onTap: () => Navigator.pushNamed(context, AIChatScreen.routeName),
+          ),
+
+          // 4. Marketplace
+          _buildDockIcon(
+            builder: () => _buildMarketplaceIcon(),
+            label: 'Store',
+            onTap: () => Navigator.pushNamed(context, MarketplaceScreen.routeName),
+          ),
+
+          // 5. Settings
+          _buildDockIcon(
+            builder: () => _buildSettingsIcon(),
+            label: 'Settings',
+            onTap: () => Navigator.pushNamed(context, SettingsScreen.routeName),
+          ),
+        ],
       ),
     );
   }

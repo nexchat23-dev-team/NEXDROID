@@ -118,20 +118,81 @@ class ReelService {
     required String fileName,
     String? thumbnailUrl,
     String? soundTrackTitle,
+    String? authorName,
+    String? authorPic,
+    String? publishingIdentity,
   }) async {
     final user = _auth.currentUser;
     final uid = user?.uid ?? currentUserId ?? 'anonymous';
-    final authorName = user?.displayName ?? user?.email?.split('@').first ?? 'NEX Creator';
-    final authorPic = user?.photoURL ?? '';
+
+    String resolvedAuthorName = authorName?.trim() ?? '';
+    String resolvedAuthorPic = authorPic?.trim() ?? '';
+    String resolvedIdentity = publishingIdentity ?? 'general';
+
+    // Query creator identity from Firestore if not provided explicitly
+    if (resolvedAuthorName.isEmpty || resolvedAuthorPic.isEmpty) {
+      try {
+        final doc = await _firestore.collection('users').doc(uid).get();
+        if (doc.exists) {
+          final udata = doc.data() ?? {};
+          final bool useCustom = udata['useCustomReelsAvatar'] == true;
+          final String customAvatar = udata['reelsAvatar']?.toString().trim() ?? '';
+          final String creatorName = udata['reelsCreatorName']?.toString().trim() ?? '';
+
+          if (resolvedAuthorName.isEmpty) {
+            if (useCustom && creatorName.isNotEmpty) {
+              resolvedAuthorName = creatorName;
+              resolvedIdentity = 'custom';
+            } else {
+              resolvedAuthorName = udata['username']?.toString().trim() ??
+                  udata['name']?.toString().trim() ??
+                  '';
+            }
+          }
+
+          if (resolvedAuthorPic.isEmpty) {
+            if (useCustom && customAvatar.isNotEmpty) {
+              resolvedAuthorPic = customAvatar;
+            } else {
+              resolvedAuthorPic = udata['photo_url']?.toString().trim() ??
+                  udata['profilePicUrl']?.toString().trim() ??
+                  udata['profilePic']?.toString().trim() ??
+                  '';
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('[ReelService] Notice fetching user creator identity: $e');
+      }
+    }
+
+    // Comprehensive fallbacks
+    if (resolvedAuthorName.isEmpty || resolvedAuthorName == '@') {
+      final authDisplayName = user?.displayName?.trim();
+      final emailPrefix = user?.email?.split('@').first.trim();
+      if (authDisplayName != null && authDisplayName.isNotEmpty && authDisplayName != '@') {
+        resolvedAuthorName = authDisplayName;
+      } else if (emailPrefix != null && emailPrefix.isNotEmpty) {
+        resolvedAuthorName = emailPrefix;
+      } else {
+        resolvedAuthorName = 'Operative';
+      }
+    }
+
+    if (resolvedAuthorPic.isEmpty) {
+      resolvedAuthorPic = user?.photoURL?.trim() ?? '';
+    }
 
     final now = DateTime.now().toUtc();
-    final soundTitle = soundTrackTitle ?? 'Original Audio — @$authorName';
+    final soundTitle = soundTrackTitle ?? 'Original Audio — @$resolvedAuthorName';
 
     final data = <String, dynamic>{
       'user_id': uid,
       'authorId': uid,
-      'authorName': authorName,
-      'authorPic': authorPic,
+      'authorName': resolvedAuthorName,
+      'username': resolvedAuthorName,
+      'authorPic': resolvedAuthorPic,
+      'publishingIdentity': resolvedIdentity,
       'title': title,
       'caption': title.isNotEmpty && description.isNotEmpty ? '$title\n$description' : (title.isNotEmpty ? title : description),
       'description': description,
@@ -155,7 +216,7 @@ class ReelService {
     };
 
     final docRef = await _firestore.collection('reels').add(data);
-    debugPrint('[ReelService] Reel record created: ${docRef.id}');
+    debugPrint('[ReelService] Reel record created: ${docRef.id} by @$resolvedAuthorName');
     return docRef.id;
   }
 
@@ -175,8 +236,21 @@ class ReelService {
 
         data['videoUrl'] = media;
         data['media_url'] = media;
-        data['username'] = data['authorName']?.toString() ?? data['username']?.toString() ?? 'nex_creator';
-        data['avatar'] = (data['username'] as String).isNotEmpty ? (data['username'] as String)[0].toUpperCase() : 'N';
+
+        // Resolve robust username
+        final rawAuthor = data['authorName']?.toString().trim();
+        final rawUser = data['username']?.toString().trim();
+        String resolvedName = 'Operative';
+        if (rawAuthor != null && rawAuthor.isNotEmpty && rawAuthor != '@') {
+          resolvedName = rawAuthor;
+        } else if (rawUser != null && rawUser.isNotEmpty && rawUser != '@') {
+          resolvedName = rawUser;
+        }
+
+        data['username'] = resolvedName;
+        data['authorName'] = resolvedName;
+        data['authorPic'] = data['authorPic']?.toString().trim() ?? data['author_pic']?.toString().trim() ?? '';
+        data['avatar'] = resolvedName.isNotEmpty ? resolvedName[0].toUpperCase() : 'O';
         data['title'] = data['title']?.toString() ?? data['caption']?.toString() ?? 'NEX Reel';
         data['description'] = data['description']?.toString() ?? data['caption']?.toString() ?? '';
         data['hashtags'] = data['hashtags']?.toString() ?? '#NEXReels';
@@ -199,6 +273,45 @@ class ReelService {
       }
       return reels;
     });
+  }
+
+  /// Get Creator Profile from Firestore (with NEXCHAT compatibility)
+  Future<Map<String, dynamic>> getCreatorProfile(String uid) async {
+    try {
+      final doc = await _firestore.collection('users').doc(uid).get();
+      if (doc.exists && doc.data() != null) {
+        return Map<String, dynamic>.from(doc.data()!);
+      }
+    } catch (e) {
+      debugPrint('[ReelService] Error loading creator profile for $uid: $e');
+    }
+    return {};
+  }
+
+  /// Save Creator Profile & Avatar Settings (1:1 with NEXCHAT schema)
+  Future<void> saveCreatorProfile({
+    required String uid,
+    required bool useCustomReelsAvatar,
+    required String reelsAvatar,
+    required String reelsCreatorName,
+    required String reelsCreatorBio,
+  }) async {
+    final payload = <String, dynamic>{
+      'useCustomReelsAvatar': useCustomReelsAvatar,
+      'reelsAvatar': reelsAvatar,
+      'reelsCreatorName': reelsCreatorName,
+      'reelsCreatorBio': reelsCreatorBio,
+    };
+    await _firestore.collection('users').doc(uid).set(payload, SetOptions(merge: true));
+    debugPrint('[ReelService] Saved creator profile for $uid');
+  }
+
+  /// Uploads custom reels avatar via Cloudinary Multi-Vault
+  Future<String> uploadCustomReelsAvatar(File file) async {
+    return await CloudinaryStorageService.instance.uploadImage(
+      file: file,
+      folder: 'nexchat-reels-avatars',
+    );
   }
 
   /// Toggle like on a reel
@@ -232,6 +345,8 @@ class ReelService {
     try {
       final commentDoc = {
         'authorId': authorId,
+        'userId': authorId,
+        'user_id': authorId,
         'authorName': authorName,
         'authorPic': authorPic ?? '',
         'text': text,

@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:ui';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
@@ -388,7 +390,7 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
             ),
             const Divider(color: Colors.white12, height: 1),
             Expanded(
-              child: reelId.isNotEmpty && !reelId.startsWith('template_')
+              child: reelId.isNotEmpty
                   ? StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                       stream: ReelService.instance.getCommentsStream(reelId),
                       builder: (context, snapshot) {
@@ -484,7 +486,7 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
                       setState(() {
                         video['comments'] = ((video['comments'] as int?) ?? 0) + 1;
                       });
-                      if (reelId.isNotEmpty && !reelId.startsWith('template_')) {
+                      if (reelId.isNotEmpty) {
                         final authorId = user?.uid ?? 'anon';
                         final authorName = user?.displayName ?? user?.email?.split('@').first ?? 'NEX User';
                         final authorPic = user?.photoURL ?? '';
@@ -643,6 +645,667 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
     );
   }
 
+  // ── NEXCHAT 1:1 Creator Profile Drawer & Settings ─────────────────────────
+  void _openCreatorProfile(Map<String, dynamic> video) async {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    final currentEmail = FirebaseAuth.instance.currentUser?.email;
+    final authorId = video['authorId']?.toString() ?? video['user_id']?.toString() ?? '';
+    final authorName = video['username']?.toString() ?? video['authorName']?.toString() ?? 'Operative';
+    final isMe = (currentUid != null && authorId == currentUid) ||
+        (currentEmail != null && currentEmail.split('@').first == authorName);
+
+    Map<String, dynamic> profile = {};
+    if (authorId.isNotEmpty) {
+      profile = await ReelService.instance.getCreatorProfile(authorId);
+    }
+
+    final bool useCustom = profile['useCustomReelsAvatar'] == true;
+    final String liveAvatar = (useCustom && (profile['reelsAvatar']?.toString().isNotEmpty ?? false))
+        ? profile['reelsAvatar'].toString()
+        : (profile['photo_url']?.toString() ?? video['authorPic']?.toString() ?? '');
+    final String liveName = (useCustom && (profile['reelsCreatorName']?.toString().isNotEmpty ?? false))
+        ? profile['reelsCreatorName'].toString()
+        : (profile['username']?.toString() ?? authorName);
+    final String liveBio = profile['reelsCreatorBio']?.toString().isNotEmpty == true
+        ? profile['reelsCreatorBio'].toString()
+        : '✨ Creating daily reels • Tap follow for more 🔥❤️';
+
+    final creatorReels = _allVideos.where((v) {
+      final vAuthorId = v['authorId']?.toString() ?? v['user_id']?.toString() ?? '';
+      final vName = v['username']?.toString() ?? v['authorName']?.toString() ?? '';
+      return (authorId.isNotEmpty && vAuthorId == authorId) || (vName == authorName);
+    }).toList();
+
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return DraggableScrollableSheet(
+              initialChildSize: 0.85,
+              minChildSize: 0.45,
+              maxChildSize: 0.95,
+              builder: (ctx, scrollController) {
+                return Container(
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF090D1C),
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+                    border: Border(top: BorderSide(color: Color(0xFF00E5FF), width: 1.5)),
+                  ),
+                  child: Column(
+                    children: [
+                      Center(
+                        child: Container(
+                          margin: const EdgeInsets.only(top: 10, bottom: 6),
+                          width: 42,
+                          height: 4.5,
+                          decoration: BoxDecoration(
+                            color: Colors.white24,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        child: Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.close_rounded, color: Colors.white, size: 22),
+                              onPressed: () => Navigator.pop(sheetContext),
+                            ),
+                            const Spacer(),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '@$liveName',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.verified_rounded, color: Color(0xFF00E5FF), size: 16),
+                              ],
+                            ),
+                            const Spacer(),
+                            IconButton(
+                              icon: const Icon(Icons.share_rounded, color: Colors.white, size: 20),
+                              onPressed: () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Creator link copied: nexchat.com/@$liveName'),
+                                    backgroundColor: const Color(0xFF0C1026),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(color: Colors.white10, height: 1),
+                      Expanded(
+                        child: ListView(
+                          controller: scrollController,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                          children: [
+                            Center(
+                              child: Stack(
+                                alignment: Alignment.bottomRight,
+                                children: [
+                                  Container(
+                                    width: 88,
+                                    height: 88,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: const LinearGradient(
+                                        colors: [Color(0xFF00E5FF), Color(0xFF8B5CF6)],
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(0xFF00E5FF).withValues(alpha: 0.35),
+                                          blurRadius: 18,
+                                        ),
+                                      ],
+                                      border: Border.all(color: Colors.white, width: 2.5),
+                                    ),
+                                    child: ClipOval(
+                                      child: liveAvatar.isNotEmpty
+                                          ? Image.network(
+                                              liveAvatar,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (_, __, ___) => Center(
+                                                child: Text(
+                                                  liveName.isNotEmpty ? liveName[0].toUpperCase() : 'N',
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 32,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                            )
+                                          : Center(
+                                              child: Text(
+                                                liveName.isNotEmpty ? liveName[0].toUpperCase() : 'N',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 32,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                    ),
+                                  ),
+                                  if (isMe)
+                                    GestureDetector(
+                                      onTap: () {
+                                        Navigator.pop(sheetContext);
+                                        _showEditCreatorProfileSheet(liveName, liveAvatar, liveBio);
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFF00E5FF),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(Icons.camera_alt_rounded, color: Colors.black, size: 15),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Center(
+                              child: Text(
+                                liveName,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            Center(
+                              child: Text(
+                                '@$liveName',
+                                style: const TextStyle(
+                                  color: Colors.white60,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.04),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Colors.white10),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                children: [
+                                  _buildProfileStatColumn('1', 'Following'),
+                                  Container(width: 1, height: 26, color: Colors.white12),
+                                  _buildProfileStatColumn(
+                                    '${((video['views'] as num?)?.toInt() ?? 14200) ~/ 35}K',
+                                    'Followers',
+                                  ),
+                                  Container(width: 1, height: 26, color: Colors.white12),
+                                  _buildProfileStatColumn(
+                                    '${((video['likes'] as num?)?.toInt() ?? 4500) ~/ 100}K',
+                                    'Likes',
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                if (isMe) ...[
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      onPressed: () {
+                                        Navigator.pop(sheetContext);
+                                        _showEditCreatorProfileSheet(liveName, liveAvatar, liveBio);
+                                      },
+                                      icon: const Icon(Icons.edit_rounded, size: 16),
+                                      label: const Text('Edit Creator Profile'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: kNeonPurple,
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                      ),
+                                    ),
+                                  ),
+                                ] else ...[
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: () {
+                                        final idx = _allVideos.indexOf(video);
+                                        if (idx != -1) _toggleFollow(idx);
+                                        setSheetState(() {});
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: video['followed'] == true
+                                            ? Colors.white.withValues(alpha: 0.15)
+                                            : const Color(0xFFFE2C55),
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                      ),
+                                      child: Text(
+                                        video['followed'] == true ? 'Following' : 'Follow',
+                                        style: const TextStyle(fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed: () {
+                                        Navigator.pop(sheetContext);
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text('Opening secure line with @$liveName...'),
+                                            backgroundColor: const Color(0xFF0C1026),
+                                            behavior: SnackBarBehavior.floating,
+                                          ),
+                                        );
+                                      },
+                                      icon: const Icon(Icons.chat_bubble_outline_rounded, size: 16),
+                                      label: const Text('Message'),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: Colors.white,
+                                        side: const BorderSide(color: Colors.white24),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF050814),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                              ),
+                              child: Text(
+                                liveBio,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12.5,
+                                  height: 1.4,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                            const SizedBox(height: 18),
+                            Row(
+                              children: [
+                                _buildTabChip('Reels (${creatorReels.length})', Icons.grid_view_rounded, true),
+                                const SizedBox(width: 8),
+                                _buildTabChip('Pics', Icons.image_outlined, false),
+                                const SizedBox(width: 8),
+                                _buildTabChip('Liked', Icons.favorite_border_rounded, false),
+                                const SizedBox(width: 8),
+                                _buildTabChip('Saved', Icons.bookmark_border_rounded, false),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            if (creatorReels.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 30),
+                                child: Center(
+                                  child: Column(
+                                    children: [
+                                      const Icon(Icons.video_collection_outlined, color: Colors.white24, size: 38),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'No reels posted yet by @$liveName',
+                                        style: const TextStyle(color: Colors.white38, fontSize: 13),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                            else
+                              GridView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 3,
+                                  childAspectRatio: 0.65,
+                                  crossAxisSpacing: 6,
+                                  mainAxisSpacing: 6,
+                                ),
+                                itemCount: creatorReels.length,
+                                itemBuilder: (ctx, i) {
+                                  final r = creatorReels[i];
+                                  final rViews = (r['views'] as num?)?.toInt() ?? 1200;
+
+                                  return GestureDetector(
+                                    onTap: () {
+                                      Navigator.pop(sheetContext);
+                                      final targetIdx = _allVideos.indexOf(r);
+                                      if (targetIdx != -1) {
+                                        _pageController.animateToPage(
+                                          targetIdx,
+                                          duration: const Duration(milliseconds: 300),
+                                          curve: Curves.easeInOut,
+                                        );
+                                      }
+                                    },
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF13192B),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(color: Colors.white12),
+                                      ),
+                                      child: Stack(
+                                        fit: StackFit.expand,
+                                        children: [
+                                          Container(
+                                            decoration: BoxDecoration(
+                                              borderRadius: BorderRadius.circular(10),
+                                              gradient: LinearGradient(
+                                                begin: Alignment.topCenter,
+                                                end: Alignment.bottomCenter,
+                                                colors: [
+                                                  Colors.transparent,
+                                                  Colors.black.withValues(alpha: 0.8),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                          Center(
+                                            child: Icon(Icons.play_circle_fill_rounded, color: Colors.white.withValues(alpha: 0.7), size: 28),
+                                          ),
+                                          Positioned(
+                                            left: 6,
+                                            bottom: 6,
+                                            right: 6,
+                                            child: Row(
+                                              children: [
+                                                const Icon(Icons.play_arrow_rounded, color: Colors.white70, size: 12),
+                                                const SizedBox(width: 2),
+                                                Expanded(
+                                                  child: Text(
+                                                    rViews > 1000 ? '${(rViews / 1000).toStringAsFixed(1)}K' : '$rViews',
+                                                    style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            const SizedBox(height: 20),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showEditCreatorProfileSheet(String currentName, String currentAvatar, String currentBio) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final nameCtrl = TextEditingController(text: currentName);
+    final bioCtrl = TextEditingController(text: currentBio);
+    bool useCustom = true;
+    String pendingAvatar = currentAvatar;
+    bool isSaving = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Color(0xFF090D1C),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                  border: Border(top: BorderSide(color: Color(0xFF00E5FF), width: 1.5)),
+                ),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text(
+                        'Reels Avatar & Creator Identity',
+                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Choose whether to use your general NEX profile picture or a dedicated avatar for Reels.',
+                        style: TextStyle(color: Colors.white60, fontSize: 12),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Container(
+                            width: 64,
+                            height: 64,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: const Color(0xFF00E5FF), width: 2),
+                            ),
+                            child: ClipOval(
+                              child: pendingAvatar.isNotEmpty
+                                  ? Image.network(
+                                      pendingAvatar,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Colors.white, size: 32),
+                                    )
+                                  : const Icon(Icons.person, color: Colors.white, size: 32),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                ElevatedButton.icon(
+                                  onPressed: () async {
+                                    final res = await FilePicker.pickFile(type: FileType.image);
+                                    if (res != null && res.path != null) {
+                                      setModalState(() => isSaving = true);
+                                      try {
+                                        final url = await ReelService.instance.uploadCustomReelsAvatar(File(res.path!));
+                                        setModalState(() {
+                                          pendingAvatar = url;
+                                          useCustom = true;
+                                          isSaving = false;
+                                        });
+                                      } catch (e) {
+                                        setModalState(() => isSaving = false);
+                                      }
+                                    }
+                                  },
+                                  icon: const Icon(Icons.cloud_upload_rounded, size: 16),
+                                  label: const Text('Upload Custom Avatar'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF00E5FF).withValues(alpha: 0.2),
+                                    foregroundColor: const Color(0xFF00E5FF),
+                                    side: const BorderSide(color: Color(0xFF00E5FF)),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  useCustom ? 'Using Custom Reels Avatar' : 'Synced with General Photo',
+                                  style: const TextStyle(color: Colors.white54, fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      const Text('Creator Display Name', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: nameCtrl,
+                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        decoration: InputDecoration(
+                          hintText: 'Your creator or stage name',
+                          hintStyle: const TextStyle(color: Colors.white30, fontSize: 13),
+                          filled: true,
+                          fillColor: const Color(0xFF0E1428),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.white12)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.white12)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF00E5FF))),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text('Reels Bio / Tagline', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: bioCtrl,
+                        maxLines: 2,
+                        maxLength: 180,
+                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                        decoration: InputDecoration(
+                          hintText: 'Tell your audience about your reels...',
+                          hintStyle: const TextStyle(color: Colors.white30, fontSize: 13),
+                          filled: true,
+                          fillColor: const Color(0xFF0E1428),
+                          counterStyle: const TextStyle(color: Colors.white24, fontSize: 10),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.white12)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.white12)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF00E5FF))),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton(
+                          onPressed: isSaving
+                              ? null
+                              : () async {
+                                  setModalState(() => isSaving = true);
+                                  final newName = nameCtrl.text.trim().isNotEmpty ? nameCtrl.text.trim() : currentName;
+                                  final newBio = bioCtrl.text.trim();
+
+                                  await ReelService.instance.saveCreatorProfile(
+                                    uid: user.uid,
+                                    useCustomReelsAvatar: useCustom,
+                                    reelsAvatar: pendingAvatar,
+                                    reelsCreatorName: newName,
+                                    reelsCreatorBio: newBio,
+                                  );
+
+                                  if (ctx.mounted) Navigator.pop(sheetCtx);
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Creator Profile & Avatar saved!'),
+                                        backgroundColor: Color(0xFF00E5FF),
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                  }
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF00FF88),
+                            foregroundColor: Colors.black,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          child: isSaving
+                              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                              : const Text('SAVE CREATOR PROFILE', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.8)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildProfileStatColumn(String count, String label) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(count, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900)),
+        const SizedBox(height: 2),
+        Text(label, style: const TextStyle(color: Colors.white54, fontSize: 11)),
+      ],
+    );
+  }
+
+  Widget _buildTabChip(String label, IconData icon, bool active) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: active ? kNeonPurple : Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: active ? kNeonPurple : Colors.white12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 13),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: active ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -654,6 +1317,23 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
         title: const Text('NEX-Reels', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
         centerTitle: true,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.account_circle_rounded, color: Color(0xFF00E5FF)),
+            tooltip: 'My Creator Profile',
+            onPressed: () {
+              final user = FirebaseAuth.instance.currentUser;
+              final myName = user?.displayName ?? user?.email?.split('@').first ?? 'Operative';
+              final myPic = user?.photoURL ?? '';
+              _openCreatorProfile({
+                'username': myName,
+                'authorName': myName,
+                'authorPic': myPic,
+                'authorId': user?.uid ?? '',
+                'likes': 0,
+                'views': 0,
+              });
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.upload_file, color: Colors.white),
             tooltip: 'Upload Reel',
@@ -867,36 +1547,69 @@ class _VideoFeedScreenState extends State<VideoFeedScreen> with TickerProviderSt
                 // Creator row
                 Row(
                   children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(colors: [accent, accent.withValues(alpha: 0.7)]),
-                        border: Border.all(color: Colors.white, width: 1.5),
-                      ),
-                      child: Center(
-                        child: Text(
-                          (video['avatar']?.toString().isNotEmpty ?? false) ? video['avatar']![0].toUpperCase() : 'N',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                    GestureDetector(
+                      onTap: () => _openCreatorProfile(video),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(colors: [accent, accent.withValues(alpha: 0.7)]),
+                          border: Border.all(color: Colors.white, width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: accent.withValues(alpha: 0.4),
+                              blurRadius: 10,
+                            ),
+                          ],
+                        ),
+                        child: ClipOval(
+                          child: (video['authorPic'] != null && video['authorPic'].toString().isNotEmpty)
+                              ? Image.network(
+                                  video['authorPic'].toString(),
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Center(
+                                    child: Text(
+                                      (video['avatar']?.toString().isNotEmpty ?? false) ? video['avatar']![0].toUpperCase() : 'N',
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                                    ),
+                                  ),
+                                )
+                              : Center(
+                                  child: Text(
+                                    (video['avatar']?.toString().isNotEmpty ?? false) ? video['avatar']![0].toUpperCase() : 'N',
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                                  ),
+                                ),
                         ),
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '@${video['username'] ?? 'creator'}',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            '${video['duration'] ?? '0:30'} • ${video['mediaLabel'] ?? 'Reel'}',
-                            style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 12),
-                          ),
-                        ],
+                      child: GestureDetector(
+                        onTap: () => _openCreatorProfile(video),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    '@${video['username'] ?? 'creator'}',
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.verified_rounded, color: Color(0xFF00E5FF), size: 14),
+                              ],
+                            ),
+                            Text(
+                              '${video['duration'] ?? '0:30'} • ${video['mediaLabel'] ?? 'NEX Clip'}',
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 12),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     GestureDetector(
@@ -1148,6 +1861,7 @@ class _ReelVideoPlayerState extends State<_ReelVideoPlayer> {
   bool _isInitialized = false;
   bool _hasError = false;
   bool _userPaused = false;
+  bool _forceCover = false;
 
   @override
   void initState() {
@@ -1241,6 +1955,10 @@ class _ReelVideoPlayerState extends State<_ReelVideoPlayer> {
       );
     }
 
+    final videoAspect = _controller!.value.aspectRatio;
+    final isWide = videoAspect > 0.75;
+    final showContainMode = isWide && !_forceCover;
+
     return GestureDetector(
       onTap: _togglePlay,
       behavior: HitTestBehavior.opaque,
@@ -1248,14 +1966,82 @@ class _ReelVideoPlayerState extends State<_ReelVideoPlayer> {
         fit: StackFit.expand,
         alignment: Alignment.center,
         children: [
-          FittedBox(
-            fit: BoxFit.cover,
-            child: SizedBox(
-              width: _controller!.value.size.width,
-              height: _controller!.value.size.height,
-              child: VideoPlayer(_controller!),
+          if (showContainMode) ...[
+            // Ambient blurred video background filling entire viewport
+            Positioned.fill(
+              child: ImageFiltered(
+                imageFilter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+                child: FittedBox(
+                  fit: BoxFit.cover,
+                  child: SizedBox(
+                    width: _controller!.value.size.width,
+                    height: _controller!.value.size.height,
+                    child: VideoPlayer(_controller!),
+                  ),
+                ),
+              ),
             ),
-          ),
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withValues(alpha: 0.5),
+              ),
+            ),
+            // Unzoomed, crisp genuine aspect ratio video in center
+            Center(
+              child: AspectRatio(
+                aspectRatio: videoAspect,
+                child: VideoPlayer(_controller!),
+              ),
+            ),
+          ] else ...[
+            // Standard full-cover video presentation for vertical 9:16 reels
+            Center(
+              child: FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: _controller!.value.size.width,
+                  height: _controller!.value.size.height,
+                  child: VideoPlayer(_controller!),
+                ),
+              ),
+            ),
+          ],
+
+          // Quick aspect ratio mode toggle for widescreen videos
+          if (isWide)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 54,
+              right: 14,
+              child: GestureDetector(
+                onTap: () {
+                  setState(() => _forceCover = !_forceCover);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.72),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white24),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _forceCover ? Icons.fit_screen_rounded : Icons.fullscreen_rounded,
+                        color: const Color(0xFF00E5FF),
+                        size: 13,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _forceCover ? 'FIT ASPECT' : 'EXPAND',
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
           if (!_controller!.value.isPlaying)
             Container(
               padding: const EdgeInsets.all(16),

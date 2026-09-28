@@ -1498,7 +1498,7 @@ service cloud.firestore {
       );
       allow update: if isSignedIn() && (
         isValidReelOwner() ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'likes', 'commentsCount', 'shares', 'updatedAt'])
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'likes', 'likesCount', 'commentsCount', 'shares', 'sharesCount', 'bookmarksCount', 'updatedAt'])
       );
       allow delete: if isValidReelOwner();
 
@@ -1507,12 +1507,14 @@ service cloud.firestore {
         allow create: if isSignedIn() && (
           request.resource.data.get('userId', '') == request.auth.uid ||
           request.resource.data.get('user_id', '') == request.auth.uid ||
+          request.resource.data.get('authorId', '') == request.auth.uid ||
           isAdmin()
         );
         allow update, delete: if isSignedIn() && (
           resource == null ||
           resource.data.get('userId', '') == request.auth.uid ||
           resource.data.get('user_id', '') == request.auth.uid ||
+          resource.data.get('authorId', '') == request.auth.uid ||
           isAdmin()
         );
       }
@@ -1762,7 +1764,8 @@ service cloud.firestore {
         resource == null ||
         resource.data.get('sellerUID', '') == request.auth.uid ||
         resource.data.get('sellerId', '') == request.auth.uid ||
-        isAdmin()
+        isAdmin() ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views'])
       );
     }
 

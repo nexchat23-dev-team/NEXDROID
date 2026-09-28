@@ -71,6 +71,14 @@ class ThemeProvider extends ChangeNotifier {
         onPrimary: Colors.black,
         onSecondary: Colors.white,
       ),
+      bannerTheme: const MaterialBannerThemeData(
+        backgroundColor: Color(0xFF0C1226),
+        contentTextStyle: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+          fontSize: 13,
+        ),
+      ),
       appBarTheme: const AppBarTheme(
         backgroundColor: kPrimaryBlue,
         elevation: 0,

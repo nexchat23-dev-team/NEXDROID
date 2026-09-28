@@ -1778,41 +1778,44 @@ class _SettingsScreenState extends State<SettingsScreen>
                   children: [
                     const Icon(Icons.verified_user_rounded, size: 14, color: kNeonGreen),
                     const SizedBox(width: 6),
-                    const Text(
-                      'STATUS: VERIFIED OPERATIVE',
-                      style: TextStyle(
-                        color: kNeonGreen,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
+                    const Flexible(
+                      child: Text(
+                        'STATUS: VERIFIED OPERATIVE',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: kNeonGreen,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
                       ),
                     ),
-                    const Spacer(),
+                    const SizedBox(width: 8),
                     InkWell(
                       borderRadius: BorderRadius.circular(10),
                       onTap: () => _showTokenBalanceDialog(context, tokenProv.balance),
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.yellowAccent.withValues(alpha: 0.12),
+                          color: const Color(0xFFFFD700).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.yellowAccent.withValues(alpha: 0.4)),
+                          border: Border.all(color: const Color(0xFFFFD700).withValues(alpha: 0.35)),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.monetization_on_rounded, color: Colors.yellowAccent, size: 14),
+                            const Icon(Icons.monetization_on_rounded, color: Color(0xFFFFD700), size: 14),
                             const SizedBox(width: 4),
                             Text(
                               '${tokenProv.balance}',
                               style: const TextStyle(
-                                color: Colors.yellowAccent,
+                                color: Color(0xFFFFD700),
                                 fontWeight: FontWeight.bold,
                                 fontSize: 12,
                               ),
                             ),
                             const SizedBox(width: 4),
-                            const Icon(Icons.add_circle_outline_rounded, color: Colors.yellowAccent, size: 13),
+                            const Icon(Icons.add_circle_outline_rounded, color: Color(0xFFFFD700), size: 13),
                           ],
                         ),
                       ),
